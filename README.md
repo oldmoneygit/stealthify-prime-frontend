@@ -1,73 +1,111 @@
-# Welcome to your Lovable project
+# STEALTHIFY.AI Frontend
 
-## Project info
+Uma plataforma moderna para camuflagem automática de produtos, permitindo que empresários vendam produtos de alto risco usando WooCommerce como vitrine e Shopify como checkout seguro.
 
-**URL**: https://lovable.dev/projects/15c954b2-043c-446a-8dd2-e35d7c117633
+## 🎨 Design System
 
-## How can I edit this code?
+- **Cores Primárias**: Azul petróleo e verde grafite para transmitir confiança e discrição
+- **Acentos**: Neon green e roxo vibrante para modernidade
+- **Tipografia**: Interface clean e tecnológica
+- **Tema**: Dark mode com elementos de glow e gradientes
 
-There are several ways of editing your application.
+## 🚀 Tecnologias
 
-**Use Lovable**
+- **React 18** com TypeScript
+- **Vite** para build rápido
+- **TailwindCSS** para estilização
+- **ShadCN UI** para componentes
+- **React Router** para navegação
+- **Lucide React** para ícones
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/15c954b2-043c-446a-8dd2-e35d7c117633) and start prompting.
+## 📱 Funcionalidades
 
-Changes made via Lovable will be committed automatically to this repo.
+### ✅ Implementadas
+- **Login/Splash** - Interface de entrada com visual imersivo
+- **Dashboard** - Visão geral com métricas e atividades
+- **Integrações** - Configuração Shopify e WooCommerce
+- **Importador** - Seleção e camuflagem de produtos
+- **Logs** - Monitoramento de operações
+- **Configurações** - Preferências do usuário
+- **Suporte** - Central de ajuda e tickets
 
-**Use your preferred IDE**
+### 🎯 Características Principais
+- Design responsivo e moderno
+- Dados mockados para demonstração
+- Componentes reutilizáveis
+- Sistema de design consistente
+- Animações suaves
+- Dark theme tecnológico
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🛠️ Como Rodar
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Desenvolvimento Local
 
-Follow these steps:
+```bash
+# Instalar dependências
+npm install
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Iniciar servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+O aplicativo estará disponível em `http://localhost:8080`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Build para Produção
 
-**Use GitHub Codespaces**
+```bash
+# Gerar build otimizado
+npm run build
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Preview do build
+npm run preview
+```
 
-## What technologies are used for this project?
+## 📁 Estrutura do Projeto
 
-This project is built with:
+```
+src/
+├── assets/          # Imagens e recursos
+├── components/      # Componentes reutilizáveis
+│   └── ui/         # Componentes ShadCN
+├── hooks/          # Custom hooks
+├── lib/            # Utilitários
+├── pages/          # Páginas da aplicação
+│   ├── Login.tsx
+│   ├── Dashboard.tsx
+│   ├── Integrations.tsx
+│   ├── Importer.tsx
+│   ├── Logs.tsx
+│   ├── Settings.tsx
+│   └── Support.tsx
+└── index.css       # Estilos globais e design system
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🎨 Design System
 
-## How can I deploy this project?
+O projeto utiliza um design system completo com:
+- Variáveis CSS customizadas
+- Paleta de cores consistente
+- Componentes padronizados
+- Animações e transições
+- Gradientes e efeitos de glow
 
-Simply open [Lovable](https://lovable.dev/projects/15c954b2-043c-446a-8dd2-e35d7c117633) and click on Share -> Publish.
+## 📝 Próximos Passos
 
-## Can I connect a custom domain to my Lovable project?
+1. **Integração Backend** - Conectar com APIs reais
+2. **Autenticação** - Sistema de login funcional
+3. **Websockets** - Updates em tempo real
+4. **Testes** - Implementar testes unitários
+5. **PWA** - Transformar em Progressive Web App
 
-Yes, you can!
+## 🤝 Contribuição
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Este é um projeto demo. Para contribuir:
+1. Fork o repositório
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Abra um Pull Request
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+---
+
+**STEALTHIFY.AI** - Transformando réplicas em produtos aprovados 🚀
