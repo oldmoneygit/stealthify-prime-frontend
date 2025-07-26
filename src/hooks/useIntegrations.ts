@@ -85,7 +85,7 @@ export function useIntegrations() {
         
         // Automatically save credentials after successful test
         const saveResult = await saveWooCommerceIntegration(
-          "SNK HOUSE", // Use the store name from form or default
+          "SNK HOUSE", // Store name is hardcoded for now, but you can make it dynamic
           storeUrl,
           consumerKey,
           consumerSecret

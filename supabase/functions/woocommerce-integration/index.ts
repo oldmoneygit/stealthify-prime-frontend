@@ -59,14 +59,36 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
       };
     }
     
-    // Now test WooCommerce API
-    const apiUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=1`;
-    console.log('Testing WooCommerce API at:', apiUrl);
+    // First try to access WooCommerce API endpoint to check if it exists
+    const apiUrl = `${cleanUrl}/wp-json/wc/v3`;
+    console.log('Testing WooCommerce API base at:', apiUrl);
+    
+    // Test the base API first
+    const baseResponse = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'WooCommerce-Integration-Test/1.0',
+        'Accept': 'application/json',
+      },
+    });
+    
+    console.log('Base API response status:', baseResponse.status);
+    
+    if (!baseResponse.ok && baseResponse.status !== 401) {
+      return {
+        success: false,
+        error: `WooCommerce API não encontrada em ${apiUrl}. Verifique se o WooCommerce está instalado e a API REST está ativada.`
+      };
+    }
+    
+    // Now test with products endpoint
+    const productsUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=1`;
+    console.log('Testing WooCommerce products API at:', productsUrl);
     
     // Create basic auth header
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
     
-    const response = await fetch(apiUrl, {
+    const response = await fetch(productsUrl, {
       headers: {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',

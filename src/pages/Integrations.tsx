@@ -55,6 +55,12 @@ const Integrations = () => {
     wooStoreName: ""
   })
 
+  // Local storage for credentials when in edit mode
+  const [savedCredentials, setSavedCredentials] = useState({
+    shopify: { url: "", token: "", storeName: "" },
+    woocommerce: { url: "", key: "", secret: "", storeName: "" }
+  })
+
   // Load existing integrations on component mount
   useEffect(() => {
     const loadIntegrations = async () => {
@@ -74,6 +80,14 @@ const Integrations = () => {
           shopifyUrl: firstShopify.storeUrl,
           shopifyStoreName: firstShopify.storeName
         }))
+        setSavedCredentials(prev => ({
+          ...prev,
+          shopify: {
+            url: firstShopify.storeUrl,
+            token: "", // Never store actual token
+            storeName: firstShopify.storeName
+          }
+        }))
         setEditMode(prev => ({ ...prev, shopify: false }))
       } else {
         setEditMode(prev => ({ ...prev, shopify: true }))
@@ -85,6 +99,15 @@ const Integrations = () => {
           ...prev,
           wooUrl: firstWoo.storeUrl,
           wooStoreName: firstWoo.storeName
+        }))
+        setSavedCredentials(prev => ({
+          ...prev,
+          woocommerce: {
+            url: firstWoo.storeUrl,
+            key: "", // Never store actual keys
+            secret: "",
+            storeName: firstWoo.storeName
+          }
         }))
         setEditMode(prev => ({ ...prev, woocommerce: false }))
       } else {
@@ -233,10 +256,32 @@ const Integrations = () => {
   }
 
   const toggleEditMode = (platform: 'shopify' | 'woocommerce') => {
+    const isEnteringEditMode = !editMode[platform]
+    
     setEditMode(prev => ({
       ...prev,
       [platform]: !prev[platform]
     }))
+    
+    // When entering edit mode, restore saved data to form
+    if (isEnteringEditMode) {
+      if (platform === 'shopify') {
+        setFormData(prev => ({
+          ...prev,
+          shopifyUrl: savedCredentials.shopify.url,
+          shopifyStoreName: savedCredentials.shopify.storeName,
+          shopifyToken: "" // Always start with empty token for security
+        }))
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          wooUrl: savedCredentials.woocommerce.url,
+          wooStoreName: savedCredentials.woocommerce.storeName,
+          wooKey: "", // Always start with empty credentials for security
+          wooSecret: ""
+        }))
+      }
+    }
   }
 
   return (
