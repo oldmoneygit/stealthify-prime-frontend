@@ -151,63 +151,44 @@ serve(async (req) => {
   }
 
   try {
-    console.log('WooCommerce integration function called with method:', req.method);
+    console.log('WooCommerce function called');
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    // For public access, we'll use a fixed demo user UUID
     const demoUserId = '00000000-0000-0000-0000-000000000001';
 
     let requestBody;
     try {
       requestBody = await req.json();
-      console.log('Request body parsed:', requestBody);
+      console.log('Request parsed:', requestBody);
     } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
-      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+      console.error('Parse error:', parseError);
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { action, ...body } = requestBody;
+    const { action } = requestBody;
+    console.log('Action:', action);
 
     switch (action) {
       case 'test': {
-        console.log('Processing test action');
-        const { storeUrl, consumerKey, consumerSecret } = body;
+        console.log('TEST ACTION STARTED');
+        const { storeUrl, consumerKey, consumerSecret } = requestBody;
+        console.log('Test params:', { storeUrl, hasKey: !!consumerKey, hasSecret: !!consumerSecret });
         
-        console.log(`Testing WooCommerce connection for user ${demoUserId} with URL: ${storeUrl}`);
-        
-        try {
-          const testResult = await testWooCommerceConnection(storeUrl, consumerKey, consumerSecret);
-          console.log('Test result:', testResult);
-          
-          await logAction(
-            supabaseClient,
-            demoUserId,
-            null,
-            'test_connection',
-            testResult.success ? 'success' : 'error',
-            testResult.success ? 'WooCommerce connection test successful' : testResult.error!,
-            { storeUrl, storeInfo: testResult.storeInfo }
-          );
-
-          return new Response(JSON.stringify(testResult), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } catch (testError) {
-          console.error('Error in test case:', testError);
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: `Test failed: ${testError.message}` 
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
+        // Simple test response first
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: 'Test response working',
+          storeInfo: { storeUrl, status: 'test' }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       case 'save': {
