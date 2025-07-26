@@ -510,8 +510,6 @@ serve(async (req) => {
               store_url: storeUrl,
               encrypted_credentials: encryptedCredentials,
               is_active: true
-            }, {
-              onConflict: 'user_id,platform,store_url'
             })
             .select()
             .single();
