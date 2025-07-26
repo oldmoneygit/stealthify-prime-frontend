@@ -91,6 +91,8 @@ const Importer = () => {
       })
 
       console.log('Response:', { data, error })
+      console.log('Data type:', typeof data)
+      console.log('Data properties:', data ? Object.keys(data) : 'no data')
 
       if (error) {
         console.error('Supabase error:', error)
@@ -103,7 +105,7 @@ const Importer = () => {
         return
       }
 
-      if (data.success) {
+      if (data && data.success) {
         // Set currency from store info or default to MXN
         const storeCurrency = data.storeInfo.currency || 'MXN'
         setSelectedCurrency(storeCurrency)
@@ -128,10 +130,11 @@ const Importer = () => {
           description: `${data.products.length} produtos encontrados (página ${page} de ${Math.ceil((data.storeInfo.totalProducts || data.products.length) / productsPerPage)})`,
         })
       } else {
+        console.log('Failed response data:', data)
         setHasWooCommerceConnection(false)
         toast({
           title: "Nenhuma integração encontrada",
-          description: data.error || "Configure uma integração WooCommerce primeiro.",
+          description: data?.error || "Configure uma integração WooCommerce primeiro.",
           variant: "destructive"
         })
       }
