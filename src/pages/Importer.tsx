@@ -81,6 +81,7 @@ const Importer = () => {
     setIsLoadingProducts(true)
     
     try {
+      console.log('Calling woocommerce-integration with:', { action: 'fetch_products', page, per_page: productsPerPage })
       const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
         body: { 
           action: 'fetch_products',
@@ -89,12 +90,14 @@ const Importer = () => {
         }
       })
 
+      console.log('Response:', { data, error })
+
       if (error) {
-        console.error('Error fetching products:', error)
+        console.error('Supabase error:', error)
         setHasWooCommerceConnection(false)
         toast({
           title: "Erro de conexão",
-          description: "Não foi possível conectar ao WooCommerce.",
+          description: "Não foi possível conectar ao WooCommerce: " + error.message,
           variant: "destructive"
         })
         return
