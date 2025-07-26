@@ -58,6 +58,8 @@ export function useIntegrations() {
   const testWooCommerceConnection = async (storeUrl: string, consumerKey: string, consumerSecret: string) => {
     setIsLoading(true);
     try {
+      console.log('Testing WooCommerce connection with:', { storeUrl, consumerKey: consumerKey.substring(0, 5) + '***' });
+      
       const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
         body: {
           action: 'test',
@@ -67,7 +69,12 @@ export function useIntegrations() {
         }
       });
 
-      if (error) throw error;
+      console.log('Response from edge function:', { data, error });
+      
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
 
       if (data.success) {
         toast({
