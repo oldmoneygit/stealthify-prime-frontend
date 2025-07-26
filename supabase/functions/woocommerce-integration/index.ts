@@ -81,6 +81,25 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
         },
       });
       console.log('Basic site response status:', basicResponse.status);
+      
+      // If basic connectivity fails, try with different paths
+      if (!basicResponse.ok && basicResponse.status !== 405) {
+        console.log('Basic HEAD request failed, trying GET to wp-json endpoint...');
+        const wpJsonResponse = await fetch(`${cleanUrl}/wp-json/`, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'WooCommerce-Integration-Test/1.0',
+          },
+        });
+        console.log('WP JSON endpoint response status:', wpJsonResponse.status);
+        
+        if (!wpJsonResponse.ok) {
+          return {
+            success: false,
+            error: `Site ${cleanUrl} não parece ser um WordPress. Verifique se a URL está correta e se o WordPress está funcionando.`
+          };
+        }
+      }
     } catch (basicError) {
       console.log('Basic connectivity failed:', basicError.message);
       return {

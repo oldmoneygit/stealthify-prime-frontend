@@ -268,7 +268,7 @@ const Integrations = () => {
     
     setEditMode(prev => ({
       ...prev,
-      [platform]: !prev[platform]
+      [platform]: isEnteringEditMode
     }))
     
     // When entering edit mode, restore saved data to form
