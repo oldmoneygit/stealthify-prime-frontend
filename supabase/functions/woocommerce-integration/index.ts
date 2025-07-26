@@ -42,16 +42,52 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
     const cleanUrl = storeUrl.replace(/\/$/, '');
     console.log('Clean URL:', cleanUrl);
     
-    // Test different WooCommerce API endpoints to find the correct one
-    const testUrls = [
-      `${cleanUrl}/wp-json/wc/v3/products?per_page=1`,
-      `${cleanUrl}/wp-json/wc/v2/products?per_page=1`,
-      `${cleanUrl}/wc-api/v3/products?per_page=1`,
-      `${cleanUrl}/index.php/wp-json/wc/v3/products?per_page=1`
-    ];
-    
     // Create basic auth header
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
+    
+    // Test different WooCommerce API endpoints with more variations
+    const testUrls = [
+      // Standard WooCommerce API paths
+      `${cleanUrl}/wp-json/wc/v3/products?per_page=1`,
+      `${cleanUrl}/wp-json/wc/v2/products?per_page=1`,
+      `${cleanUrl}/wp-json/wc/v1/products?per_page=1`,
+      
+      // Alternative paths for different server configurations
+      `${cleanUrl}/index.php/wp-json/wc/v3/products?per_page=1`,
+      `${cleanUrl}/index.php/wp-json/wc/v2/products?per_page=1`,
+      
+      // Legacy API paths
+      `${cleanUrl}/wc-api/v3/products?per_page=1`,
+      `${cleanUrl}/wc-api/v2/products?per_page=1`,
+      `${cleanUrl}/wc-api/v1/products?per_page=1`,
+      
+      // WordPress subdirectory installations
+      `${cleanUrl}/wordpress/wp-json/wc/v3/products?per_page=1`,
+      `${cleanUrl}/wp/wp-json/wc/v3/products?per_page=1`,
+      `${cleanUrl}/blog/wp-json/wc/v3/products?per_page=1`,
+      
+      // Alternative API endpoints
+      `${cleanUrl}/wp-json/wc/v3/system_status`,
+      `${cleanUrl}/wp-json/wc/v3/data/currencies`,
+    ];
+    
+    // First test basic connectivity to the site
+    console.log('Testing basic site connectivity...');
+    try {
+      const basicResponse = await fetch(cleanUrl, {
+        method: 'HEAD',
+        headers: {
+          'User-Agent': 'WooCommerce-Integration-Test/1.0',
+        },
+      });
+      console.log('Basic site response status:', basicResponse.status);
+    } catch (basicError) {
+      console.log('Basic connectivity failed:', basicError.message);
+      return {
+        success: false,
+        error: `Não foi possível conectar ao site ${cleanUrl}. Verifique se a URL está correta e acessível.`
+      };
+    }
     
     for (const testUrl of testUrls) {
       console.log('Testing API URL:', testUrl);
@@ -64,20 +100,20 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
             'User-Agent': 'WooCommerce-Integration-Test/1.0',
             'Accept': 'application/json',
           },
+          // Add timeout to prevent hanging
+          signal: AbortSignal.timeout(15000) // 15 second timeout
         });
 
-        console.log('API response status:', response.status);
-        console.log('API response content-type:', response.headers.get('content-type'));
+        console.log(`API response for ${testUrl}: status ${response.status}, content-type: ${response.headers.get('content-type')}`);
 
         if (response.ok) {
-          let data;
           try {
             const responseText = await response.text();
             console.log('Raw API response (first 200 chars):', responseText.substring(0, 200));
             
             // Check if response is JSON
             if (responseText.trim().startsWith('[') || responseText.trim().startsWith('{')) {
-              data = JSON.parse(responseText);
+              const data = JSON.parse(responseText);
               console.log('Successfully parsed JSON response');
               
               return {
@@ -85,14 +121,17 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
                 storeInfo: {
                   storeUrl: cleanUrl,
                   productsCount: Array.isArray(data) ? data.length : 0,
-                  apiVersion: testUrl.includes('/v3/') ? 'v3' : 'v2',
+                  apiVersion: testUrl.includes('/v3/') ? 'v3' : testUrl.includes('/v2/') ? 'v2' : 'v1',
                   apiUrl: testUrl,
                   status: 'connected'
                 }
               };
+            } else {
+              console.log('Response is not JSON, trying next URL');
+              continue;
             }
           } catch (parseError) {
-            console.log('Failed to parse response as JSON:', parseError);
+            console.log('Failed to parse response as JSON:', parseError.message);
             continue; // Try next URL
           }
         } else if (response.status === 401) {
@@ -103,11 +142,14 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
         } else if (response.status === 403) {
           return {
             success: false,
-            error: `Acesso negado. Verifique se as chaves API têm as permissões necessárias.`
+            error: `Acesso negado. Verifique se as chaves API têm as permissões necessárias (read/write).`
           };
+        } else {
+          console.log(`URL ${testUrl} returned status ${response.status}, trying next...`);
+          continue; // Try next URL
         }
       } catch (urlError) {
-        console.log(`Error testing ${testUrl}:`, urlError);
+        console.log(`Error testing ${testUrl}:`, urlError.message);
         continue; // Try next URL
       }
     }
@@ -115,20 +157,32 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
     // If we get here, none of the URLs worked
     return {
       success: false,
-      error: `WooCommerce REST API não encontrada. Possíveis causas:\n
-      1. WooCommerce não está instalado ou ativado\n
-      2. REST API está desabilitada\n
-      3. Permalink personalizado não está configurado\n
-      4. Servidor tem configuração especial de URLs`
+      error: `WooCommerce REST API não encontrada em ${cleanUrl}. 
+
+Possíveis soluções:
+1. Verifique se o WooCommerce está instalado e ativado
+2. Ative a REST API em WooCommerce → Configurações → Avançado → REST API
+3. Configure permalinks em WordPress → Configurações → Links Permanentes (use "Nome do post" ou "Estrutura personalizada")
+4. Verifique se não há plugins de cache ou segurança bloqueando a API
+5. Teste a URL diretamente: ${cleanUrl}/wp-json/wc/v3/products
+
+Se o site está em um subdiretório, inclua o caminho completo na URL.`
     };
     
   } catch (error) {
     console.error('WooCommerce connection error:', error);
     
+    if (error.name === 'AbortError') {
+      return {
+        success: false,
+        error: `Timeout: A conexão demorou muito para responder. Verifique se o servidor está funcionando corretamente.`
+      };
+    }
+    
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       return {
         success: false,
-        error: `Erro de conexão: Não foi possível conectar à URL. Verifique se a URL está correta e acessível.`
+        error: `Erro de conexão: Não foi possível conectar ao servidor. Verifique se a URL está correta e acessível.`
       };
     }
     

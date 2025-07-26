@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useIntegrations, type Integration } from "@/hooks/useIntegrations"
+import { supabase } from "@/integrations/supabase/client"
 import { 
   ShoppingBag, 
   Settings, 
@@ -291,6 +292,45 @@ const Integrations = () => {
     }
   }
 
+  // Add function to test with saved credentials
+  const testWithSavedCredentials = async (platform: 'shopify' | 'woocommerce') => {
+    if (platform === 'shopify') {
+      // For Shopify, we need to get the encrypted credentials from the database
+      const integrations = await getIntegrations('shopify')
+      if (integrations.length > 0) {
+        // Call edge function to test with saved credentials
+        const { data, error } = await supabase.functions.invoke('shopify-integration', {
+          body: {
+            action: 'test_saved',
+            integrationId: integrations[0].id
+          }
+        });
+
+        if (error) {
+          toast({
+            title: "Erro na conexão",
+            description: "Falha ao testar conexão com credenciais salvas",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (data.success) {
+          toast({
+            title: "Conexão bem-sucedida!",
+            description: `Conectado à loja: ${data.shopInfo?.name || integrations[0].storeUrl}`,
+          });
+        } else {
+          toast({
+            title: "Erro na conexão",
+            description: data.error,
+            variant: "destructive",
+          });
+        }
+      }
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -506,7 +546,7 @@ const Integrations = () => {
             ) : (
               <Button 
                 variant="outline"
-                onClick={() => testConnection('shopify')}
+                onClick={() => testWithSavedCredentials('shopify')}
                 disabled={isLoadingShopify}
               >
                 <TestTube className="w-4 h-4 mr-2" />

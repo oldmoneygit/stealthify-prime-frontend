@@ -127,6 +127,96 @@ serve(async (req) => {
         });
       }
 
+      case 'test_saved': {
+        console.log('Processing test_saved action for user:', demoUserId);
+        
+        const { integrationId } = requestBody;
+        
+        if (!integrationId) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: 'Integration ID is required'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        try {
+          // Get the saved integration
+          const { data: integration, error: fetchError } = await supabaseClient
+            .from('user_integrations')
+            .select('*')
+            .eq('id', integrationId)
+            .eq('user_id', demoUserId)
+            .eq('integration_type', 'shopify')
+            .single();
+
+          if (fetchError || !integration) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Integration not found'
+            }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          // Decrypt credentials
+          const encryptionKey = demoUserId;
+          const decryptedCredentials = decrypt(integration.encrypted_credentials, encryptionKey);
+          const credentials: ShopifyCredentials = JSON.parse(decryptedCredentials);
+
+          // Test the connection
+          const testResult = await testShopifyConnection(credentials.shopUrl, credentials.accessToken);
+
+          if (testResult.success) {
+            // Update last sync time
+            await supabaseClient
+              .from('user_integrations')
+              .update({
+                last_sync_at: new Date().toISOString(),
+                status: 'connected',
+                error_message: null
+              })
+              .eq('id', integrationId);
+
+            await logAction(
+              supabaseClient,
+              demoUserId,
+              integrationId,
+              'test_saved_connection',
+              'success',
+              'Shopify connection test successful with saved credentials',
+              { shopInfo: testResult.shopInfo }
+            );
+          } else {
+            await logAction(
+              supabaseClient,
+              demoUserId,
+              integrationId,
+              'test_saved_connection',
+              'error',
+              'Shopify connection test failed: ' + testResult.error,
+              { error: testResult.error }
+            );
+          }
+
+          return new Response(JSON.stringify(testResult), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (error) {
+          console.error('Error testing saved credentials:', error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Failed to test saved credentials'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       case 'save': {
         const { storeName, shopUrl, accessToken } = body;
         
