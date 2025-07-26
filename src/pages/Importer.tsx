@@ -38,6 +38,9 @@ interface WooProduct {
   status: string;
   description: string;
   permalink: string;
+  currency: string;
+  priceInBRL?: number;
+  salePriceInBRL?: number;
 }
 
 // Store info interface
@@ -46,6 +49,7 @@ interface StoreInfo {
   url: string;
   totalProducts: number;
   apiUsed: string;
+  currency: string;
 }
 
 const Importer = () => {
@@ -62,6 +66,7 @@ const Importer = () => {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null)
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [hasWooCommerceConnection, setHasWooCommerceConnection] = useState<boolean | null>(null)
+  const [exchangeRate, setExchangeRate] = useState<number>(1)
 
   // Load WooCommerce products on component mount
   useEffect(() => {
@@ -88,6 +93,11 @@ const Importer = () => {
       }
 
       if (data.success) {
+        // Get exchange rate if currency is not BRL
+        if (data.storeInfo.currency !== 'BRL') {
+          await fetchExchangeRate(data.storeInfo.currency)
+        }
+        
         setProducts(data.products)
         setStoreInfo(data.storeInfo)
         setHasWooCommerceConnection(true)
@@ -201,6 +211,40 @@ const Importer = () => {
     })
   }
 
+  const fetchExchangeRate = async (fromCurrency: string) => {
+    try {
+      const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${fromCurrency}`)
+      const data = await response.json()
+      setExchangeRate(data.rates.BRL || 1)
+    } catch (error) {
+      console.error('Error fetching exchange rate:', error)
+      setExchangeRate(1)
+    }
+  }
+
+  const formatPrice = (price: number, currency: string) => {
+    const currencySymbols: { [key: string]: string } = {
+      'USD': '$',
+      'EUR': '€',
+      'MXN': 'MX$',
+      'BRL': 'R$',
+      'GBP': '£'
+    }
+    
+    const symbol = currencySymbols[currency] || currency
+    const priceInBRL = currency !== 'BRL' ? price * exchangeRate : price
+    
+    if (currency === 'BRL') {
+      return `${symbol} ${price.toFixed(2)}`
+    }
+    
+    return `${symbol} ${price.toFixed(2)} ~ R$ ${priceInBRL.toFixed(2)}`
+  }
+
+  const handleViewProduct = (permalink: string) => {
+    window.open(permalink, '_blank', 'noopener,noreferrer')
+  }
+
   const refreshProducts = async () => {
     await fetchProducts()
   }
@@ -303,7 +347,7 @@ const Importer = () => {
 
             <div className="space-y-2">
               <Label htmlFor="camouflage-image">Imagem Camuflada</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+              <div className="border-2 border-dashed border-border rounded-lg p-4 text-center relative">
                 {camouflageImage ? (
                   <div className="space-y-2">
                     <CheckCircle className="w-8 h-8 text-accent mx-auto" />
@@ -324,7 +368,7 @@ const Importer = () => {
                   id="camouflage-image"
                   type="file"
                   accept="image/*"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   onChange={handleImageUpload}
                 />
               </div>
@@ -456,11 +500,11 @@ const Importer = () => {
                           <div className="flex items-center gap-2">
                             {product.salePrice && (
                               <span className="text-sm text-muted-foreground line-through">
-                                R$ {product.price.toFixed(2)}
+                                {formatPrice(product.price, product.currency)}
                               </span>
                             )}
                             <span className="font-bold text-accent">
-                              R$ {(product.salePrice || product.price).toFixed(2)}
+                              {formatPrice(product.salePrice || product.price, product.currency)}
                             </span>
                           </div>
                           <div className="flex items-center gap-1 mt-1 justify-end">
@@ -473,7 +517,12 @@ const Importer = () => {
                       </div>
                     </div>
 
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleViewProduct(product.permalink)}
+                      title="Ver produto na loja"
+                    >
                       <Eye className="w-4 h-4" />
                     </Button>
                   </div>
@@ -512,12 +561,24 @@ const Importer = () => {
                   </p>
                 </div>
               </div>
-               <div className="text-right">
+                <div className="text-right">
                  <p className="font-bold text-xl text-accent">
-                   R$ {products
-                     .filter(p => selectedProducts.includes(p.id))
-                     .reduce((sum, p) => sum + (p.salePrice || p.price), 0)
-                     .toFixed(2)}
+                   {storeInfo?.currency && storeInfo.currency !== 'BRL' ? (
+                     <>
+                       {storeInfo.currency === 'MXN' ? 'MX$' : storeInfo.currency} {products
+                         .filter(p => selectedProducts.includes(p.id))
+                         .reduce((sum, p) => sum + (p.salePrice || p.price), 0)
+                         .toFixed(2)} ~ R$ {(products
+                         .filter(p => selectedProducts.includes(p.id))
+                         .reduce((sum, p) => sum + (p.salePrice || p.price), 0) * exchangeRate)
+                         .toFixed(2)}
+                     </>
+                   ) : (
+                     `R$ ${products
+                       .filter(p => selectedProducts.includes(p.id))
+                       .reduce((sum, p) => sum + (p.salePrice || p.price), 0)
+                       .toFixed(2)}`
+                   )}
                  </p>
                  <p className="text-sm text-muted-foreground">Valor total</p>
                </div>

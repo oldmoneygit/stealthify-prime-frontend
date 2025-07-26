@@ -303,9 +303,39 @@ serve(async (req) => {
             });
           }
 
-          // Fetch products from WooCommerce
+          // First get store settings to determine currency
           const auth = btoa(`${credentials.consumerKey}:${credentials.consumerSecret}`);
           const cleanUrl = credentials.storeUrl.replace(/\/$/, '');
+          
+          // Fetch general settings first to get currency
+          const settingsUrls = [
+            `${cleanUrl}/wp-json/wc/v3/settings/general`,
+            `${cleanUrl}/wp-json/wc/v2/settings/general`,
+            `${cleanUrl}/index.php/wp-json/wc/v3/settings/general`,
+          ];
+
+          let generalSettings: any = {};
+          for (const settingsUrl of settingsUrls) {
+            try {
+              const settingsResponse = await fetch(settingsUrl, {
+                headers: {
+                  'Authorization': `Basic ${auth}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+
+              if (settingsResponse.ok) {
+                const settingsData = await settingsResponse.json();
+                generalSettings = settingsData.reduce((acc: any, setting: any) => {
+                  acc[setting.id] = setting.value;
+                  return acc;
+                }, {});
+                break;
+              }
+            } catch (error) {
+              console.log(`Error fetching settings from ${settingsUrl}:`, error.message);
+            }
+          }
           
           // Try different API endpoints to find products
           const productUrls = [
@@ -345,7 +375,8 @@ serve(async (req) => {
                     category: product.categories && product.categories.length > 0 ? product.categories[0].name : 'Sem categoria',
                     status: product.status,
                     description: product.description || product.short_description || '',
-                    permalink: product.permalink
+                    permalink: product.permalink,
+                    currency: generalSettings.woocommerce_currency || 'BRL'
                   }));
                   apiUsed = productUrl;
                   break;
@@ -377,7 +408,8 @@ serve(async (req) => {
               name: integrationData.store_name,
               url: integrationData.store_url,
               totalProducts: products.length,
-              apiUsed: apiUsed
+              apiUsed: apiUsed,
+              currency: generalSettings.woocommerce_currency || 'BRL'
             }
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
