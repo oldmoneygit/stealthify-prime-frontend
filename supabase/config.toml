@@ -1,1 +1,7 @@
 project_id = "nkazwhfkpwlxmyapwihs"
+
+[functions.shopify-integration]
+verify_jwt = true
+
+[functions.woocommerce-integration]
+verify_jwt = true

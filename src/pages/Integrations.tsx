@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import { useIntegrations, type Integration } from "@/hooks/useIntegrations"
 import { 
   ShoppingBag, 
   Settings, 
@@ -20,82 +21,156 @@ import {
 
 const Integrations = () => {
   const { toast } = useToast()
+  const {
+    isLoading,
+    testShopifyConnection,
+    testWooCommerceConnection,
+    saveShopifyIntegration,
+    saveWooCommerceIntegration,
+    getIntegrations
+  } = useIntegrations()
+
   const [showSecrets, setShowSecrets] = useState({
     shopifyToken: false,
     wooKey: false,
     wooSecret: false
   })
 
-  // Mock integration status
-  const [integrations, setIntegrations] = useState({
-    shopify: {
-      connected: true,
-      url: "https://minha-loja.myshopify.com",
-      token: "shpat_xxxxx...xxxxx",
-      lastSync: "há 2 minutos"
-    },
-    woocommerce: {
-      connected: true,
-      url: "https://meusite.com.br",
-      key: "ck_xxxxx...xxxxx",
-      secret: "cs_xxxxx...xxxxx",
-      lastSync: "há 5 minutos"
-    }
-  })
+  const [shopifyIntegrations, setShopifyIntegrations] = useState<Integration[]>([])
+  const [wooCommerceIntegrations, setWooCommerceIntegrations] = useState<Integration[]>([])
 
   const [formData, setFormData] = useState({
-    shopifyUrl: integrations.shopify.url,
-    shopifyToken: integrations.shopify.token,
-    wooUrl: integrations.woocommerce.url,
-    wooKey: integrations.woocommerce.key,
-    wooSecret: integrations.woocommerce.secret
+    shopifyUrl: "",
+    shopifyToken: "",
+    shopifyStoreName: "",
+    wooUrl: "",
+    wooKey: "",
+    wooSecret: "",
+    wooStoreName: ""
   })
 
-  const handleSave = (platform: 'shopify' | 'woocommerce') => {
-    if (platform === 'shopify') {
-      setIntegrations(prev => ({
-        ...prev,
-        shopify: {
-          ...prev.shopify,
-          url: formData.shopifyUrl,
-          token: formData.shopifyToken,
-          connected: true,
-          lastSync: "agora"
-        }
-      }))
-    } else {
-      setIntegrations(prev => ({
-        ...prev,
-        woocommerce: {
-          ...prev.woocommerce,
-          url: formData.wooUrl,
-          key: formData.wooKey,
-          secret: formData.wooSecret,
-          connected: true,
-          lastSync: "agora"
-        }
-      }))
+  // Load existing integrations on component mount
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      const [shopifyData, wooCommerceData] = await Promise.all([
+        getIntegrations('shopify'),
+        getIntegrations('woocommerce')
+      ])
+      
+      setShopifyIntegrations(shopifyData)
+      setWooCommerceIntegrations(wooCommerceData)
+
+      // Pre-fill form with first integration if available
+      if (shopifyData.length > 0) {
+        const firstShopify = shopifyData[0]
+        setFormData(prev => ({
+          ...prev,
+          shopifyUrl: firstShopify.storeUrl,
+          shopifyStoreName: firstShopify.storeName
+        }))
+      }
+
+      if (wooCommerceData.length > 0) {
+        const firstWoo = wooCommerceData[0]
+        setFormData(prev => ({
+          ...prev,
+          wooUrl: firstWoo.storeUrl,
+          wooStoreName: firstWoo.storeName
+        }))
+      }
     }
 
-    toast({
-      title: "Integração salva!",
-      description: `Credenciais do ${platform === 'shopify' ? 'Shopify' : 'WooCommerce'} atualizadas com sucesso.`,
-    })
+    loadIntegrations()
+  }, [getIntegrations])
+
+  const handleSave = async (platform: 'shopify' | 'woocommerce') => {
+    if (platform === 'shopify') {
+      if (!formData.shopifyUrl || !formData.shopifyToken || !formData.shopifyStoreName) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha todos os campos do Shopify",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const result = await saveShopifyIntegration(
+        formData.shopifyStoreName,
+        formData.shopifyUrl,
+        formData.shopifyToken
+      )
+
+      if (result.success) {
+        // Reload integrations
+        const shopifyData = await getIntegrations('shopify')
+        setShopifyIntegrations(shopifyData)
+      }
+    } else {
+      if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret || !formData.wooStoreName) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha todos os campos do WooCommerce",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const result = await saveWooCommerceIntegration(
+        formData.wooStoreName,
+        formData.wooUrl,
+        formData.wooKey,
+        formData.wooSecret
+      )
+
+      if (result.success) {
+        // Reload integrations
+        const wooCommerceData = await getIntegrations('woocommerce')
+        setWooCommerceIntegrations(wooCommerceData)
+      }
+    }
   }
 
   const testConnection = async (platform: 'shopify' | 'woocommerce') => {
-    toast({
-      title: "Testando conexão...",
-      description: `Verificando credenciais do ${platform === 'shopify' ? 'Shopify' : 'WooCommerce'}`,
-    })
+    if (platform === 'shopify') {
+      if (!formData.shopifyUrl || !formData.shopifyToken) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha URL e Token do Shopify para testar",
+          variant: "destructive"
+        })
+        return
+      }
+      await testShopifyConnection(formData.shopifyUrl, formData.shopifyToken)
+    } else {
+      if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha todos os campos do WooCommerce para testar",
+          variant: "destructive"
+        })
+        return
+      }
+      await testWooCommerceConnection(formData.wooUrl, formData.wooKey, formData.wooSecret)
+    }
+  }
 
-    // Simulate API test
-    setTimeout(() => {
-      toast({
-        title: "Conexão bem-sucedida!",
-        description: `${platform === 'shopify' ? 'Shopify' : 'WooCommerce'} conectado e funcionando.`,
-      })
-    }, 2000)
+  // Get current integration status for display
+  const getShopifyStatus = () => {
+    const integration = shopifyIntegrations[0]
+    return {
+      connected: integration?.status === 'connected',
+      url: integration?.storeUrl || 'Não configurado',
+      lastSync: integration?.lastSync ? new Date(integration.lastSync).toLocaleString('pt-BR') : 'Nunca'
+    }
+  }
+
+  const getWooCommerceStatus = () => {
+    const integration = wooCommerceIntegrations[0]
+    return {
+      connected: integration?.status === 'connected',
+      url: integration?.storeUrl || 'Não configurado',
+      lastSync: integration?.lastSync ? new Date(integration.lastSync).toLocaleString('pt-BR') : 'Nunca'
+    }
   }
 
   const copyToClipboard = (text: string) => {
@@ -137,8 +212,8 @@ const Integrations = () => {
                   <CardDescription>Plataforma de checkout</CardDescription>
                 </div>
               </div>
-              <Badge variant={integrations.shopify.connected ? "default" : "destructive"} className="bg-accent">
-                {integrations.shopify.connected ? (
+              <Badge variant={getShopifyStatus().connected ? "default" : "destructive"} className="bg-accent">
+                {getShopifyStatus().connected ? (
                   <><CheckCircle className="w-3 h-3 mr-1" /> Conectado</>
                 ) : (
                   <><AlertCircle className="w-3 h-3 mr-1" /> Desconectado</>
@@ -149,11 +224,11 @@ const Integrations = () => {
           <CardContent className="space-y-2">
             <div className="text-sm">
               <span className="text-muted-foreground">URL: </span>
-              <span className="text-foreground">{integrations.shopify.url}</span>
+              <span className="text-foreground">{getShopifyStatus().url}</span>
             </div>
             <div className="text-sm">
               <span className="text-muted-foreground">Última sincronização: </span>
-              <span className="text-accent">{integrations.shopify.lastSync}</span>
+              <span className="text-accent">{getShopifyStatus().lastSync}</span>
             </div>
           </CardContent>
         </Card>
@@ -170,8 +245,8 @@ const Integrations = () => {
                   <CardDescription>Vitrine de produtos</CardDescription>
                 </div>
               </div>
-              <Badge variant={integrations.woocommerce.connected ? "default" : "destructive"} className="bg-accent">
-                {integrations.woocommerce.connected ? (
+              <Badge variant={getWooCommerceStatus().connected ? "default" : "destructive"} className="bg-accent">
+                {getWooCommerceStatus().connected ? (
                   <><CheckCircle className="w-3 h-3 mr-1" /> Conectado</>
                 ) : (
                   <><AlertCircle className="w-3 h-3 mr-1" /> Desconectado</>
@@ -182,11 +257,11 @@ const Integrations = () => {
           <CardContent className="space-y-2">
             <div className="text-sm">
               <span className="text-muted-foreground">URL: </span>
-              <span className="text-foreground">{integrations.woocommerce.url}</span>
+              <span className="text-foreground">{getWooCommerceStatus().url}</span>
             </div>
             <div className="text-sm">
               <span className="text-muted-foreground">Última sincronização: </span>
-              <span className="text-accent">{integrations.woocommerce.lastSync}</span>
+              <span className="text-accent">{getWooCommerceStatus().lastSync}</span>
             </div>
           </CardContent>
         </Card>
@@ -205,6 +280,17 @@ const Integrations = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="shopify-store-name">Nome da Loja</Label>
+              <Input
+                id="shopify-store-name"
+                placeholder="Minha Loja Shopify"
+                value={formData.shopifyStoreName}
+                onChange={(e) => setFormData(prev => ({ ...prev, shopifyStoreName: e.target.value }))}
+                className="bg-background/50"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="shopify-url">URL da Loja Shopify</Label>
               <Input
@@ -260,16 +346,18 @@ const Integrations = () => {
             <Button 
               onClick={() => handleSave('shopify')}
               className="bg-gradient-primary hover:shadow-glow"
+              disabled={isLoading}
             >
               <Zap className="w-4 h-4 mr-2" />
-              Salvar Shopify
+              {isLoading ? "Salvando..." : "Salvar Shopify"}
             </Button>
             <Button 
               variant="outline"
               onClick={() => testConnection('shopify')}
+              disabled={isLoading}
             >
               <TestTube className="w-4 h-4 mr-2" />
-              Testar Conexão
+              {isLoading ? "Testando..." : "Testar Conexão"}
             </Button>
           </div>
         </CardContent>
@@ -288,6 +376,17 @@ const Integrations = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="woo-store-name">Nome da Loja</Label>
+              <Input
+                id="woo-store-name"
+                placeholder="Minha Loja WooCommerce"
+                value={formData.wooStoreName}
+                onChange={(e) => setFormData(prev => ({ ...prev, wooStoreName: e.target.value }))}
+                className="bg-background/50"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="woo-url">URL do WooCommerce</Label>
               <Input
@@ -380,16 +479,18 @@ const Integrations = () => {
             <Button 
               onClick={() => handleSave('woocommerce')}
               className="bg-gradient-primary hover:shadow-glow"
+              disabled={isLoading}
             >
               <Zap className="w-4 h-4 mr-2" />
-              Salvar WooCommerce
+              {isLoading ? "Salvando..." : "Salvar WooCommerce"}
             </Button>
             <Button 
               variant="outline"
               onClick={() => testConnection('woocommerce')}
+              disabled={isLoading}
             >
               <TestTube className="w-4 h-4 mr-2" />
-              Testar Conexão
+              {isLoading ? "Testando..." : "Testar Conexão"}
             </Button>
           </div>
         </CardContent>
