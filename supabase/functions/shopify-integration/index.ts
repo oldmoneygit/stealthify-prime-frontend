@@ -306,7 +306,7 @@ serve(async (req) => {
       const { product }: { product: ShopifyProduct } = requestData
       console.log('Product to import:', product.sku, product.camouflageTitle)
       
-      // Get Shopify credentials
+      // Get Shopify credentials (get the most recent one)
       console.log('Fetching Shopify integration...')
       const demoUserId = '00000000-0000-0000-0000-000000000001';
       const { data: integrations, error: integrationsError } = await supabaseClient
@@ -315,11 +315,13 @@ serve(async (req) => {
         .eq('platform', 'shopify')
         .eq('user_id', demoUserId)
         .eq('is_active', true)
-        .maybeSingle()
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-      console.log('Integration found:', !!integrations, 'Error:', integrationsError)
+      console.log('Integration query result:', integrations, 'Error:', integrationsError)
+      const integration = integrations && integrations.length > 0 ? integrations[0] : null;
 
-      if (integrationsError || !integrations) {
+      if (integrationsError || !integration) {
         console.error('No Shopify integration found:', integrationsError)
         
         // Return a more informative error for demo purposes
@@ -337,10 +339,10 @@ serve(async (req) => {
       }
 
       // Decrypt credentials
-      console.log('Decrypting credentials...')
+      console.log('Decrypting credentials for integration:', integration.id)
       const { data: decryptedData, error: decryptError } = await supabaseClient.rpc(
         'decrypt_integration_credentials',
-        { encrypted_data: integrations.encrypted_credentials }
+        { encrypted_data: integration.encrypted_credentials }
       )
 
       console.log('Decryption result:', !!decryptedData, 'Error:', decryptError)
