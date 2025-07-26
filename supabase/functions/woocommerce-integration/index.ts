@@ -455,13 +455,13 @@ serve(async (req) => {
       }
 
       case 'save': {
-        console.log('Processing save action for user:', demoUserId);
-        console.log('Request body for save:', JSON.stringify(requestBody));
+        console.log('🚀 Processing save action for user:', demoUserId);
+        console.log('📝 Request body for save:', JSON.stringify(requestBody, null, 2));
         
         const { storeName, storeUrl, consumerKey, consumerSecret } = requestBody;
         
         if (!storeName || !storeUrl || !consumerKey || !consumerSecret) {
-          console.log('Missing required fields for save');
+          console.log('❌ Missing required fields for save');
           return new Response(
             JSON.stringify({ success: false, error: 'Missing required fields' }),
             { 
@@ -472,22 +472,13 @@ serve(async (req) => {
         }
 
         try {
-          console.log(`Saving WooCommerce integration for user ${demoUserId}`);
+          console.log(`💾 Saving WooCommerce integration for user ${demoUserId}`);
 
-          // First test the connection
-          const testResult = await testWooCommerceConnection(storeUrl, consumerKey, consumerSecret);
-          
-          if (!testResult.success) {
-            return new Response(JSON.stringify({
-              success: false,
-              error: 'Invalid credentials: ' + testResult.error
-            }), {
-              status: 400,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
+          // Skip test for save - already tested in frontend
+          console.log('⏭️ Skipping connection test during save (already validated)');
 
           // Encrypt credentials
+          console.log('🔐 Encrypting credentials...');
           const credentials: WooCommerceCredentials = { storeUrl, consumerKey, consumerSecret };
           const { data: encryptedCredentials, error: encryptError } = await supabaseClient.rpc(
             'encrypt_integration_credentials',
@@ -495,10 +486,13 @@ serve(async (req) => {
           );
 
           if (encryptError) {
-            throw new Error('Erro ao criptografar credenciais');
+            console.error('❌ Encryption error:', encryptError);
+            throw new Error('Erro ao criptografar credenciais: ' + encryptError.message);
           }
 
-          console.log('Attempting to save to database...');
+          console.log('✅ Credentials encrypted successfully');
+
+          console.log('💾 Attempting to save to database...');
 
           // Save to database
           const { data, error } = await supabaseClient
@@ -515,7 +509,11 @@ serve(async (req) => {
             .single();
 
           if (error) {
-            console.error('Database error:', error);
+            console.error('❌ Database error:', error);
+            throw new Error('Database error: ' + error.message);
+          }
+
+          console.log('✅ Successfully saved to database:', data?.id);
             await logAction(
               supabaseClient,
               demoUserId,
