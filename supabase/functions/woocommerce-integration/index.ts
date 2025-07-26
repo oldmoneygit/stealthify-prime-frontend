@@ -192,89 +192,120 @@ serve(async (req) => {
       }
 
       case 'save': {
+        console.log('Processing save action for user:', demoUserId);
+        console.log('Request body for save:', JSON.stringify(requestBody));
+        
         const { storeName, storeUrl, consumerKey, consumerSecret } = requestBody;
         
-        console.log(`Saving WooCommerce integration for user ${demoUserId}`);
-
-        // First test the connection
-        const testResult = await testWooCommerceConnection(storeUrl, consumerKey, consumerSecret);
-        
-        if (!testResult.success) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Invalid credentials: ' + testResult.error
-          }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+        if (!storeName || !storeUrl || !consumerKey || !consumerSecret) {
+          console.log('Missing required fields for save');
+          return new Response(
+            JSON.stringify({ success: false, error: 'Missing required fields' }),
+            { 
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
         }
 
-        // Encrypt credentials
-        const encryptionKey = demoUserId; // Using demo user ID as encryption key
-        const credentials: WooCommerceCredentials = { storeUrl, consumerKey, consumerSecret };
-        const encryptedCredentials = encrypt(JSON.stringify(credentials), encryptionKey);
+        try {
+          console.log(`Saving WooCommerce integration for user ${demoUserId}`);
 
-        // Save to database
-        const { data, error } = await supabaseClient
-          .from('user_integrations')
-          .upsert({
-            user_id: demoUserId,
-            integration_type: 'woocommerce',
-            store_name: storeName,
-            store_url: storeUrl,
-            encrypted_credentials: encryptedCredentials,
-            status: 'connected',
-            last_sync_at: new Date().toISOString(),
-            error_message: null
-          }, {
-            onConflict: 'user_id,integration_type,store_url'
-          })
-          .select()
-          .single();
+          // First test the connection
+          const testResult = await testWooCommerceConnection(storeUrl, consumerKey, consumerSecret);
+          
+          if (!testResult.success) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Invalid credentials: ' + testResult.error
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
 
-        if (error) {
-          console.error('Database error:', error);
+          // Encrypt credentials
+          const encryptionKey = demoUserId; // Using demo user ID as encryption key
+          const credentials: WooCommerceCredentials = { storeUrl, consumerKey, consumerSecret };
+          const encryptedCredentials = encrypt(JSON.stringify(credentials), encryptionKey);
+
+          console.log('Attempting to save to database...');
+
+          // Save to database
+          const { data, error } = await supabaseClient
+            .from('user_integrations')
+            .upsert({
+              user_id: demoUserId,
+              integration_type: 'woocommerce',
+              store_name: storeName,
+              store_url: storeUrl,
+              encrypted_credentials: encryptedCredentials,
+              status: 'connected',
+              last_sync_at: new Date().toISOString(),
+              error_message: null
+            }, {
+              onConflict: 'user_id,integration_type'
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Database error:', error);
+            await logAction(
+              supabaseClient,
+              demoUserId,
+              null,
+              'save_integration',
+              'error',
+              'Failed to save integration: ' + error.message,
+              { storeUrl, error }
+            );
+
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Failed to save integration',
+              details: error.message
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          console.log('Save successful:', data);
+
           await logAction(
             supabaseClient,
             demoUserId,
-            null,
+            data.id,
             'save_integration',
-            'error',
-            'Failed to save integration: ' + error.message,
-            { storeUrl, error }
+            'success',
+            'WooCommerce integration saved successfully',
+            { storeUrl, storeName, storeInfo: testResult.storeInfo }
           );
 
           return new Response(JSON.stringify({
-            success: false,
-            error: 'Failed to save integration'
+            success: true,
+            message: 'Integration saved successfully',
+            integration: {
+              id: data.id,
+              storeName,
+              storeUrl,
+              status: 'connected',
+              lastSync: data.last_sync_at
+            }
           }), {
-            status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
+        } catch (error) {
+          console.log('Unexpected error during save:', error);
+          return new Response(
+            JSON.stringify({ success: false, error: 'Unexpected error occurred', details: error.message }),
+            { 
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
         }
-
-        await logAction(
-          supabaseClient,
-          demoUserId,
-          data.id,
-          'save_integration',
-          'success',
-          'WooCommerce integration saved successfully',
-          { storeUrl, storeName, storeInfo: testResult.storeInfo }
-        );
-
-        return new Response(JSON.stringify({
-          success: true,
-          integration: {
-            id: data.id,
-            storeName,
-            storeUrl,
-            status: 'connected',
-            lastSync: data.last_sync_at
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
       }
 
       case 'list': {

@@ -40,6 +40,11 @@ const Integrations = () => {
   const [shopifyIntegrations, setShopifyIntegrations] = useState<Integration[]>([])
   const [wooCommerceIntegrations, setWooCommerceIntegrations] = useState<Integration[]>([])
 
+  const [editMode, setEditMode] = useState({
+    shopify: false,
+    woocommerce: false
+  })
+
   const [formData, setFormData] = useState({
     shopifyUrl: "",
     shopifyToken: "",
@@ -69,6 +74,9 @@ const Integrations = () => {
           shopifyUrl: firstShopify.storeUrl,
           shopifyStoreName: firstShopify.storeName
         }))
+        setEditMode(prev => ({ ...prev, shopify: false }))
+      } else {
+        setEditMode(prev => ({ ...prev, shopify: true }))
       }
 
       if (wooCommerceData.length > 0) {
@@ -78,6 +86,9 @@ const Integrations = () => {
           wooUrl: firstWoo.storeUrl,
           wooStoreName: firstWoo.storeName
         }))
+        setEditMode(prev => ({ ...prev, woocommerce: false }))
+      } else {
+        setEditMode(prev => ({ ...prev, woocommerce: true }))
       }
     }
 
@@ -105,6 +116,9 @@ const Integrations = () => {
         // Reload integrations
         const shopifyData = await getIntegrations('shopify')
         setShopifyIntegrations(shopifyData)
+        setEditMode(prev => ({ ...prev, shopify: false }))
+        // Clear sensitive data from form
+        setFormData(prev => ({ ...prev, shopifyToken: "" }))
       }
     } else {
       if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret || !formData.wooStoreName) {
@@ -127,6 +141,9 @@ const Integrations = () => {
         // Reload integrations
         const wooCommerceData = await getIntegrations('woocommerce')
         setWooCommerceIntegrations(wooCommerceData)
+        setEditMode(prev => ({ ...prev, woocommerce: false }))
+        // Clear sensitive data from form
+        setFormData(prev => ({ ...prev, wooKey: "", wooSecret: "" }))
       }
     }
   }
@@ -186,6 +203,13 @@ const Integrations = () => {
     setShowSecrets(prev => ({
       ...prev,
       [field]: !prev[field]
+    }))
+  }
+
+  const toggleEditMode = (platform: 'shopify' | 'woocommerce') => {
+    setEditMode(prev => ({
+      ...prev,
+      [platform]: !prev[platform]
     }))
   }
 
@@ -280,86 +304,137 @@ const Integrations = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="shopify-store-name">Nome da Loja</Label>
-              <Input
-                id="shopify-store-name"
-                placeholder="Minha Loja Shopify"
-                value={formData.shopifyStoreName}
-                onChange={(e) => setFormData(prev => ({ ...prev, shopifyStoreName: e.target.value }))}
-                className="bg-background/50"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shopify-url">URL da Loja Shopify</Label>
-              <Input
-                id="shopify-url"
-                placeholder="https://minha-loja.myshopify.com"
-                value={formData.shopifyUrl}
-                onChange={(e) => setFormData(prev => ({ ...prev, shopifyUrl: e.target.value }))}
-                className="bg-background/50"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shopify-token">Access Token (Private App)</Label>
-              <div className="relative">
-                <Input
-                  id="shopify-token"
-                  type={showSecrets.shopifyToken ? "text" : "password"}
-                  placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
-                  value={formData.shopifyToken}
-                  onChange={(e) => setFormData(prev => ({ ...prev, shopifyToken: e.target.value }))}
-                  className="bg-background/50 pr-20"
-                />
-                <div className="absolute right-1 top-1 flex gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
+          {!editMode.shopify && shopifyIntegrations.length > 0 ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-accent/10 rounded-lg border border-accent/20">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-medium text-foreground">Configuração Ativa</h4>
+                    <p className="text-sm text-muted-foreground">Shopify está configurado e conectado</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
                     size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => toggleShowSecret('shopifyToken')}
+                    onClick={() => toggleEditMode('shopify')}
                   >
-                    {showSecrets.shopifyToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => copyToClipboard(formData.shopifyToken)}
-                  >
-                    <Copy className="h-4 w-4" />
+                    Editar Credenciais
                   </Button>
                 </div>
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Loja: </span>
+                    <span className="text-foreground">{shopifyIntegrations[0]?.storeName}</span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">URL: </span>
+                    <span className="text-foreground">{shopifyIntegrations[0]?.storeUrl}</span>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Crie um Private App no Shopify Admin → Apps → Private apps
-              </p>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="shopify-store-name">Nome da Loja</Label>
+                <Input
+                  id="shopify-store-name"
+                  placeholder="Minha Loja Shopify"
+                  value={formData.shopifyStoreName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, shopifyStoreName: e.target.value }))}
+                  className="bg-background/50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="shopify-url">URL da Loja Shopify</Label>
+                <Input
+                  id="shopify-url"
+                  placeholder="https://minha-loja.myshopify.com"
+                  value={formData.shopifyUrl}
+                  onChange={(e) => setFormData(prev => ({ ...prev, shopifyUrl: e.target.value }))}
+                  className="bg-background/50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="shopify-token">Access Token (Private App)</Label>
+                <div className="relative">
+                  <Input
+                    id="shopify-token"
+                    type={showSecrets.shopifyToken ? "text" : "password"}
+                    placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+                    value={formData.shopifyToken}
+                    onChange={(e) => setFormData(prev => ({ ...prev, shopifyToken: e.target.value }))}
+                    className="bg-background/50 pr-20"
+                  />
+                  <div className="absolute right-1 top-1 flex gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => toggleShowSecret('shopifyToken')}
+                    >
+                      {showSecrets.shopifyToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => copyToClipboard(formData.shopifyToken)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Crie um Private App no Shopify Admin → Apps → Private apps
+                </p>
+              </div>
+            </div>
+          )}
 
           <Separator />
 
           <div className="flex gap-3">
-            <Button 
-              onClick={() => handleSave('shopify')}
-              className="bg-gradient-primary hover:shadow-glow"
-              disabled={isLoadingShopify}
-            >
-              <Zap className="w-4 h-4 mr-2" />
-              {isLoadingShopify ? "Salvando..." : "Salvar Shopify"}
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => testConnection('shopify')}
-              disabled={isLoadingShopify}
-            >
-              <TestTube className="w-4 h-4 mr-2" />
-              {isLoadingShopify ? "Testando..." : "Testar Conexão"}
-            </Button>
+            {editMode.shopify || shopifyIntegrations.length === 0 ? (
+              <>
+                <Button 
+                  onClick={() => handleSave('shopify')}
+                  className="bg-gradient-primary hover:shadow-glow"
+                  disabled={isLoadingShopify}
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  {isLoadingShopify ? "Salvando..." : "Salvar Shopify"}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => testConnection('shopify')}
+                  disabled={isLoadingShopify}
+                >
+                  <TestTube className="w-4 h-4 mr-2" />
+                  {isLoadingShopify ? "Testando..." : "Testar Conexão"}
+                </Button>
+                {editMode.shopify && (
+                  <Button 
+                    variant="ghost"
+                    onClick={() => toggleEditMode('shopify')}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button 
+                variant="outline"
+                onClick={() => testConnection('shopify')}
+                disabled={isLoadingShopify}
+              >
+                <TestTube className="w-4 h-4 mr-2" />
+                {isLoadingShopify ? "Testando..." : "Testar Conexão"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -376,123 +451,174 @@ const Integrations = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="woo-store-name">Nome da Loja</Label>
-              <Input
-                id="woo-store-name"
-                placeholder="Minha Loja WooCommerce"
-                value={formData.wooStoreName}
-                onChange={(e) => setFormData(prev => ({ ...prev, wooStoreName: e.target.value }))}
-                className="bg-background/50"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="woo-url">URL do WooCommerce</Label>
-              <Input
-                id="woo-url"
-                placeholder="https://meusite.com.br"
-                value={formData.wooUrl}
-                onChange={(e) => setFormData(prev => ({ ...prev, wooUrl: e.target.value }))}
-                className="bg-background/50"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="woo-key">Consumer Key</Label>
-                <div className="relative">
-                  <Input
-                    id="woo-key"
-                    type={showSecrets.wooKey ? "text" : "password"}
-                    placeholder="ck_xxxxxxxxxxxxxxxxxxxxxxxx"
-                    value={formData.wooKey}
-                    onChange={(e) => setFormData(prev => ({ ...prev, wooKey: e.target.value }))}
-                    className="bg-background/50 pr-20"
-                  />
-                  <div className="absolute right-1 top-1 flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => toggleShowSecret('wooKey')}
-                    >
-                      {showSecrets.wooKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => copyToClipboard(formData.wooKey)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+          {!editMode.woocommerce && wooCommerceIntegrations.length > 0 ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-accent/10 rounded-lg border border-accent/20">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-medium text-foreground">Configuração Ativa</h4>
+                    <p className="text-sm text-muted-foreground">WooCommerce está configurado e conectado</p>
                   </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => toggleEditMode('woocommerce')}
+                  >
+                    Editar Credenciais
+                  </Button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="woo-secret">Consumer Secret</Label>
-                <div className="relative">
-                  <Input
-                    id="woo-secret"
-                    type={showSecrets.wooSecret ? "text" : "password"}
-                    placeholder="cs_xxxxxxxxxxxxxxxxxxxxxxxx"
-                    value={formData.wooSecret}
-                    onChange={(e) => setFormData(prev => ({ ...prev, wooSecret: e.target.value }))}
-                    className="bg-background/50 pr-20"
-                  />
-                  <div className="absolute right-1 top-1 flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => toggleShowSecret('wooSecret')}
-                    >
-                      {showSecrets.wooSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => copyToClipboard(formData.wooSecret)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Loja: </span>
+                    <span className="text-foreground">{wooCommerceIntegrations[0]?.storeName}</span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">URL: </span>
+                    <span className="text-foreground">{wooCommerceIntegrations[0]?.storeUrl}</span>
                   </div>
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="woo-store-name">Nome da Loja</Label>
+                <Input
+                  id="woo-store-name"
+                  placeholder="Minha Loja WooCommerce"
+                  value={formData.wooStoreName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, wooStoreName: e.target.value }))}
+                  className="bg-background/50"
+                />
+              </div>
 
-            <p className="text-xs text-muted-foreground">
-              Gere as chaves API em: WooCommerce → Configurações → Avançado → REST API
-            </p>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="woo-url">URL do WooCommerce</Label>
+                <Input
+                  id="woo-url"
+                  placeholder="https://meusite.com.br"
+                  value={formData.wooUrl}
+                  onChange={(e) => setFormData(prev => ({ ...prev, wooUrl: e.target.value }))}
+                  className="bg-background/50"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="woo-key">Consumer Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="woo-key"
+                      type={showSecrets.wooKey ? "text" : "password"}
+                      placeholder="ck_xxxxxxxxxxxxxxxxxxxxxxxx"
+                      value={formData.wooKey}
+                      onChange={(e) => setFormData(prev => ({ ...prev, wooKey: e.target.value }))}
+                      className="bg-background/50 pr-20"
+                    />
+                    <div className="absolute right-1 top-1 flex gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => toggleShowSecret('wooKey')}
+                      >
+                        {showSecrets.wooKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => copyToClipboard(formData.wooKey)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="woo-secret">Consumer Secret</Label>
+                  <div className="relative">
+                    <Input
+                      id="woo-secret"
+                      type={showSecrets.wooSecret ? "text" : "password"}
+                      placeholder="cs_xxxxxxxxxxxxxxxxxxxxxxxx"
+                      value={formData.wooSecret}
+                      onChange={(e) => setFormData(prev => ({ ...prev, wooSecret: e.target.value }))}
+                      className="bg-background/50 pr-20"
+                    />
+                    <div className="absolute right-1 top-1 flex gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => toggleShowSecret('wooSecret')}
+                      >
+                        {showSecrets.wooSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => copyToClipboard(formData.wooSecret)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Gere as chaves API em: WooCommerce → Configurações → Avançado → REST API
+              </p>
+            </div>
+          )}
 
           <Separator />
 
           <div className="flex gap-3">
-            <Button 
-              onClick={() => handleSave('woocommerce')}
-              className="bg-gradient-primary hover:shadow-glow"
-              disabled={isLoadingWooCommerce}
-            >
-              <Zap className="w-4 h-4 mr-2" />
-              {isLoadingWooCommerce ? "Salvando..." : "Salvar WooCommerce"}
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => testConnection('woocommerce')}
-              disabled={isLoadingWooCommerce}
-            >
-              <TestTube className="w-4 h-4 mr-2" />
-              {isLoadingWooCommerce ? "Testando..." : "Testar Conexão"}
-            </Button>
+            {editMode.woocommerce || wooCommerceIntegrations.length === 0 ? (
+              <>
+                <Button 
+                  onClick={() => handleSave('woocommerce')}
+                  className="bg-gradient-primary hover:shadow-glow"
+                  disabled={isLoadingWooCommerce}
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  {isLoadingWooCommerce ? "Salvando..." : "Salvar WooCommerce"}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => testConnection('woocommerce')}
+                  disabled={isLoadingWooCommerce}
+                >
+                  <TestTube className="w-4 h-4 mr-2" />
+                  {isLoadingWooCommerce ? "Testando..." : "Testar Conexão"}
+                </Button>
+                {editMode.woocommerce && (
+                  <Button 
+                    variant="ghost"
+                    onClick={() => toggleEditMode('woocommerce')}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button 
+                variant="outline"
+                onClick={() => testConnection('woocommerce')}
+                disabled={isLoadingWooCommerce}
+              >
+                <TestTube className="w-4 h-4 mr-2" />
+                {isLoadingWooCommerce ? "Testando..." : "Testar Conexão"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
