@@ -93,6 +93,102 @@ serve(async (req) => {
       }
     }
 
+    if (action === 'test_saved') {
+      console.log('🔍 Testing Shopify connection with saved credentials...')
+      const { integrationId } = requestData
+      
+      if (!integrationId) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Integration ID is required'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      try {
+        // Get integration from database
+        const { data: integrationData, error: integrationError } = await supabaseClient
+          .from('integrations')
+          .select('*')
+          .eq('id', integrationId)
+          .eq('platform', 'shopify')
+          .eq('is_active', true)
+          .single();
+
+        if (integrationError || !integrationData) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Integration not found or inactive'
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Decrypt credentials
+        const { data: decryptedCredentials, error: decryptError } = await supabaseClient.rpc(
+          'decrypt_integration_credentials',
+          { encrypted_data: integrationData.encrypted_credentials }
+        );
+        
+        if (decryptError) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Failed to decrypt credentials'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const credentials = JSON.parse(decryptedCredentials);
+        
+        // Extract shop name from URL
+        const shopName = credentials.shopUrl.replace(/^https?:\/\//, '').replace('.myshopify.com', '').replace(/\/$/, '')
+        
+        // Test connection to Shopify API
+        const testResponse = await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/shop.json`, {
+          headers: {
+            'X-Shopify-Access-Token': credentials.accessToken,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!testResponse.ok) {
+          const errorText = await testResponse.text()
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `Falha na autenticação: ${testResponse.status} - ${errorText}` 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        const shopInfo = await testResponse.json()
+        console.log('✅ Shopify connection test with saved credentials successful')
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            shopInfo: shopInfo.shop 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('❌ Shopify test_saved error:', error)
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message || 'Erro ao testar conexão com credenciais salvas' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     if (action === 'save') {
       console.log('💾 Saving Shopify integration...')
       const { storeName, shopUrl, accessToken } = requestData
@@ -102,7 +198,7 @@ serve(async (req) => {
         const shopName = shopUrl.replace(/^https?:\/\//, '').replace('.myshopify.com', '').replace(/\/$/, '')
         
         // Encrypt credentials
-        const credentials = JSON.stringify({ shopName, accessToken })
+        const credentials = JSON.stringify({ shopName, shopUrl, accessToken })
         const { data: encryptedCredentials, error: encryptError } = await supabaseClient.rpc(
           'encrypt_integration_credentials',
           { data: credentials }
