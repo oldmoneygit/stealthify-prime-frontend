@@ -6,6 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to add logs to database
+async function addLog(supabaseClient: any, level: string, source: string, message: string, details?: any) {
+  try {
+    await supabaseClient.from('integration_logs').insert({
+      action: 'woocommerce_operation',
+      status: level.toLowerCase(),
+      message: `[${source}] ${message}`,
+      details: details ? { level, source, details } : { level, source },
+      user_id: '00000000-0000-0000-0000-000000000001', // Demo user
+      integration_id: null
+    })
+  } catch (error) {
+    console.error('Failed to add log:', error)
+  }
+}
+
 interface WooCommerceCredentials {
   storeUrl: string;
   consumerKey: string;
@@ -275,6 +291,7 @@ serve(async (req) => {
         console.log('Extracted pagination:', { page, per_page });
         
         try {
+          await addLog(supabaseClient, 'INFO', 'WOOCOMMERCE', `Iniciando busca de produtos - Página ${page}`, { page, per_page })
           console.log('🔍 Looking for WooCommerce integration...');
           const { data: integrationData, error: integrationError } = await supabaseClient
             .from('integrations')

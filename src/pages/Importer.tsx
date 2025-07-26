@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
+import { useLog } from "@/contexts/LogContext"
 import { supabase } from "@/integrations/supabase/client"
 import { 
   Upload, 
@@ -54,6 +55,7 @@ interface StoreInfo {
 
 const Importer = () => {
   const { toast } = useToast()
+  const { addLog } = useLog()
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [genericTitle, setGenericTitle] = useState("Produto Premium")
@@ -81,6 +83,7 @@ const Importer = () => {
     setIsLoadingProducts(true)
     
     try {
+      addLog('INFO', 'IMPORTER', `Buscando produtos WooCommerce - Página ${page}`, { page, per_page: productsPerPage })
       console.log('Calling woocommerce-integration with:', { action: 'fetch_products', page, per_page: productsPerPage })
       const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
         body: { 
@@ -95,6 +98,7 @@ const Importer = () => {
       console.log('Data properties:', data ? Object.keys(data) : 'no data')
 
       if (error) {
+        addLog('ERROR', 'IMPORTER', 'Erro ao buscar produtos WooCommerce', { error: error.message, page })
         console.error('Supabase error:', error)
         setHasWooCommerceConnection(false)
         toast({
@@ -106,6 +110,12 @@ const Importer = () => {
       }
 
       if (data && data.success) {
+        addLog('SUCCESS', 'IMPORTER', `Produtos WooCommerce carregados com sucesso - Página ${page}`, { 
+          productsFound: data.products.length, 
+          totalProducts: data.storeInfo.totalProducts,
+          storeName: data.storeInfo.name 
+        })
+        
         // Set currency from store info or default to MXN
         const storeCurrency = data.storeInfo.currency || 'MXN'
         setSelectedCurrency(storeCurrency)
@@ -130,6 +140,7 @@ const Importer = () => {
           description: `${data.products.length} produtos encontrados (página ${page} de ${Math.ceil((data.storeInfo.totalProducts || data.products.length) / productsPerPage)})`,
         })
       } else {
+        addLog('WARNING', 'IMPORTER', 'Falha ao carregar produtos WooCommerce', { response: data })
         console.log('Failed response data:', data)
         setHasWooCommerceConnection(false)
         toast({
@@ -139,6 +150,7 @@ const Importer = () => {
         })
       }
     } catch (error) {
+      addLog('ERROR', 'IMPORTER', 'Erro inesperado ao buscar produtos', { error: error.message })
       console.error('Unexpected error:', error)
       setHasWooCommerceConnection(false)
       toast({
@@ -186,6 +198,7 @@ const Importer = () => {
 
   const handleImport = async () => {
     if (selectedProducts.length === 0) {
+      addLog('WARNING', 'IMPORTER', 'Tentativa de importação sem produtos selecionados')
       toast({
         title: "Nenhum produto selecionado",
         description: "Selecione pelo menos um produto para importar.",
@@ -195,6 +208,7 @@ const Importer = () => {
     }
 
     if (!camouflageImage) {
+      addLog('WARNING', 'IMPORTER', 'Tentativa de importação sem imagem camuflada')
       toast({
         title: "Imagem necessária",
         description: "Faça upload de uma imagem camuflada para continuar.",
@@ -203,6 +217,12 @@ const Importer = () => {
       return
     }
 
+    addLog('INFO', 'IMPORTER', `Iniciando importação de ${selectedProducts.length} produtos`, { 
+      productsCount: selectedProducts.length,
+      genericTitle,
+      imageFileName: camouflageImage.name 
+    })
+    
     setIsImporting(true)
     setImportProgress(0)
 
@@ -221,6 +241,13 @@ const Importer = () => {
         const product = selectedProductsData[i]
         
         try {
+          addLog('INFO', 'IMPORTER', `Importando produto ${product.sku} para Shopify`, { 
+            sku: product.sku,
+            name: product.name,
+            price: product.price,
+            progress: `${i + 1}/${selectedProductsData.length}`
+          })
+          
           // Import product to Shopify
           console.log('Importing product to Shopify:', product.sku)
           const { data, error } = await supabase.functions.invoke('shopify-integration', {
@@ -237,14 +264,31 @@ const Importer = () => {
           console.log('Shopify response:', data, error)
 
           if (error) {
+            addLog('ERROR', 'IMPORTER', `Erro ao importar produto ${product.sku}`, { 
+              sku: product.sku,
+              error: error.message 
+            })
             throw new Error(`Erro ao importar ${product.sku}: ${error.message}`)
           }
 
           // Handle demo mode (when no real Shopify integration is configured)
           if (data?.demo) {
+            addLog('SUCCESS', 'IMPORTER', `Produto ${product.sku} importado (modo demo)`, { 
+              sku: product.sku,
+              demo: true 
+            })
             console.log('Demo mode - simulating successful import')
           } else if (!data?.success) {
+            addLog('ERROR', 'IMPORTER', `Falha ao importar produto ${product.sku}`, { 
+              sku: product.sku,
+              response: data 
+            })
             throw new Error(`Erro ao importar ${product.sku}: ${data?.error || 'Erro desconhecido'}`)
+          } else {
+            addLog('SUCCESS', 'IMPORTER', `Produto ${product.sku} importado com sucesso`, { 
+              sku: product.sku,
+              shopifyId: data.productId 
+            })
           }
           
           const progress = ((i + 1) / selectedProductsData.length) * 100
