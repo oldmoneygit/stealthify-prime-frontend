@@ -348,7 +348,7 @@ serve(async (req) => {
         console.log('🔥 Processing fetch_products action');
         console.log('Request body received:', JSON.stringify(requestBody, null, 2));
         
-        const { page = 1, per_page = 250 } = requestBody;
+        const { page = 1, per_page = 100 } = requestBody; // WooCommerce REST API maximum is 100
         console.log('Extracted pagination:', { page, per_page });
         
         try {
@@ -464,8 +464,9 @@ serve(async (req) => {
           const totalProducts = parseInt(countResponse.headers.get('X-WP-Total') || '0');
           console.log('📊 Total products from WooCommerce header:', totalProducts);
           
-          // Fetch products with pagination
-          const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=${per_page}&page=${page}&status=publish`;
+          // Fetch products with pagination (WooCommerce REST API allows max 100 per_page)
+          const validPerPage = Math.min(per_page, 100);
+          const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=${validPerPage}&page=${page}&status=publish`;
           console.log('🛍️ Fetching products from:', productUrl);
           
           const response = await fetch(productUrl, {

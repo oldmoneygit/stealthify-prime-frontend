@@ -72,7 +72,7 @@ const Importer = () => {
   const [selectedCurrency, setSelectedCurrency] = useState<string>('MXN')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalProducts, setTotalProducts] = useState(0)
-  const productsPerPage = 250
+  const productsPerPage = 100 // WooCommerce REST API maximum per_page limit
 
   // Load WooCommerce products on component mount
   useEffect(() => {
