@@ -83,8 +83,9 @@ const Importer = () => {
     setIsLoadingProducts(true)
     
     try {
-      addLog('INFO', 'IMPORTER', `Buscando produtos WooCommerce - Página ${page}`, { page, per_page: productsPerPage })
-      console.log('Calling woocommerce-integration with:', { action: 'fetch_products', page, per_page: productsPerPage })
+      addLog('INFO', 'IMPORTER', `🚀 Iniciando busca de produtos WooCommerce - Página ${page}`, { page, per_page: productsPerPage })
+      console.log('🔍 Calling woocommerce-integration with:', { action: 'fetch_products', page, per_page: productsPerPage })
+      
       const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
         body: { 
           action: 'fetch_products',
@@ -93,31 +94,71 @@ const Importer = () => {
         }
       })
 
-      console.log('Response:', { data, error })
-      console.log('Data type:', typeof data)
-      console.log('Data properties:', data ? Object.keys(data) : 'no data')
+      console.log('📦 Response received:')
+      console.log('- Data:', data)
+      console.log('- Error:', error)
+      console.log('- Data type:', typeof data)
+      console.log('- Data properties:', data ? Object.keys(data) : 'no data')
+      console.log('- Data success:', data?.success)
 
       if (error) {
-        addLog('ERROR', 'IMPORTER', 'Erro ao buscar produtos WooCommerce', { error: error.message, page })
-        console.error('Supabase error:', error)
+        addLog('ERROR', 'IMPORTER', '❌ Erro na função edge do WooCommerce', { 
+          error: error.message, 
+          page,
+          errorType: error.name || 'Unknown',
+          statusCode: error.status || 'Unknown'
+        })
+        console.error('❌ Supabase function error:', error)
         setHasWooCommerceConnection(false)
         toast({
           title: "Erro de conexão",
-          description: "Não foi possível conectar ao WooCommerce: " + error.message,
+          description: `Falha na função edge: ${error.message}`,
           variant: "destructive"
         })
         return
       }
 
-      if (data && data.success) {
-        addLog('SUCCESS', 'IMPORTER', `Produtos WooCommerce carregados com sucesso - Página ${page}`, { 
-          productsFound: data.products.length, 
-          totalProducts: data.storeInfo.totalProducts,
-          storeName: data.storeInfo.name 
+      // Verificar se a resposta tem o formato esperado
+      if (!data) {
+        addLog('ERROR', 'IMPORTER', '❌ Resposta vazia da função edge', { page })
+        console.error('❌ No data received from edge function')
+        setHasWooCommerceConnection(false)
+        toast({
+          title: "Erro de dados",
+          description: "Nenhum dado recebido do servidor",
+          variant: "destructive"
+        })
+        return
+      }
+
+      if (data.success === false) {
+        addLog('ERROR', 'IMPORTER', '❌ Função edge retornou erro', { 
+          error: data.error, 
+          page 
+        })
+        console.error('❌ Edge function returned error:', data.error)
+        setHasWooCommerceConnection(false)
+        toast({
+          title: "Erro na integração",
+          description: data.error || "Erro desconhecido na busca de produtos",
+          variant: "destructive"
+        })
+        return
+      }
+
+      if (data.success === true) {
+        addLog('SUCCESS', 'IMPORTER', `✅ Produtos WooCommerce carregados - Página ${page}`, { 
+          productsFound: data.products?.length || 0, 
+          totalProducts: data.storeInfo?.totalProducts || 0,
+          storeName: data.storeInfo?.name || 'Unknown'
         })
         
+        console.log('✅ Products loaded successfully:')
+        console.log('- Products count:', data.products?.length || 0)
+        console.log('- Store info:', data.storeInfo)
+        
         // Set currency from store info or default to MXN
-        const storeCurrency = data.storeInfo.currency || 'MXN'
+        const storeCurrency = data.storeInfo?.currency || 'MXN'
         setSelectedCurrency(storeCurrency)
         
         // Get exchange rate if currency is not BRL

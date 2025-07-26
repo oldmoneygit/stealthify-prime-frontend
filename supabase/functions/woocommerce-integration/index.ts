@@ -354,6 +354,7 @@ serve(async (req) => {
         try {
           await addLog(supabaseClient, 'INFO', 'WOOCOMMERCE', `Iniciando busca de produtos - Página ${page}`, { page, per_page })
           console.log('🔍 Looking for WooCommerce integration...');
+          
           const { data: integrationData, error: integrationError } = await supabaseClient
             .from('integrations')
             .select('*')
@@ -362,39 +363,75 @@ serve(async (req) => {
             .eq('is_active', true)
             .maybeSingle();
 
-          console.log('Integration query result:', { integrationData, integrationError });
+          console.log('🔍 Integration query results:');
+          console.log('- Integration Data:', integrationData);
+          console.log('- Integration Error:', integrationError);
+          console.log('- Demo User ID used:', demoUserId);
 
-          if (integrationError || !integrationData) {
-            console.error('❌ No WooCommerce integration found');
+          if (integrationError) {
+            console.error('❌ Database error when fetching integration:', integrationError);
+            await addLog(supabaseClient, 'ERROR', 'WOOCOMMERCE', 'Erro ao buscar integração no banco', { error: integrationError.message });
             return new Response(JSON.stringify({
               success: false,
-              error: 'Nenhuma integração WooCommerce conectada encontrada'
+              error: `Erro de banco de dados: ${integrationError.message}`
             }), {
-              status: 400,
+              status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
           }
 
-          console.log('Using integration:', integrationData.id);
+          if (!integrationData) {
+            console.error('❌ No WooCommerce integration found for user:', demoUserId);
+            await addLog(supabaseClient, 'ERROR', 'WOOCOMMERCE', 'Nenhuma integração WooCommerce encontrada', { userId: demoUserId });
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Nenhuma integração WooCommerce conectada encontrada. Configure uma integração na seção de Integrações.'
+            }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          console.log('✅ Using integration:', integrationData.id);
+          console.log('- Store Name:', integrationData.store_name);
+          console.log('- Store URL:', integrationData.store_url);
+          console.log('- Is Active:', integrationData.is_active);
 
           // Decrypt credentials
+          console.log('🔐 Decrypting credentials...');
           const { data: decryptedCredentials, error: decryptError } = await supabaseClient.rpc(
             'decrypt_integration_credentials',
             { encrypted_data: integrationData.encrypted_credentials }
           );
           
           if (decryptError) {
-            throw new Error('Failed to decrypt credentials');
+            console.error('❌ Failed to decrypt credentials:', decryptError);
+            await addLog(supabaseClient, 'ERROR', 'WOOCOMMERCE', 'Falha ao descriptografar credenciais', { error: decryptError.message });
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Falha ao descriptografar credenciais'
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           }
 
+          console.log('✅ Credentials decrypted successfully');
           const credentials = JSON.parse(decryptedCredentials);
+          console.log('- Store URL from credentials:', credentials.storeUrl);
+          console.log('- Consumer Key exists:', !!credentials.consumerKey);
+          console.log('- Consumer Secret exists:', !!credentials.consumerSecret);
+          
           const auth = btoa(`${credentials.consumerKey}:${credentials.consumerSecret}`);
           const cleanUrl = credentials.storeUrl.replace(/\/$/, '');
+          console.log('- Clean URL for API calls:', cleanUrl);
           
+          
+          console.log('🚀 Starting WooCommerce API calls...');
           
           // First, get total count for pagination
           const countUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=1&status=publish`;
-          console.log('Getting total count from:', countUrl);
+          console.log('📊 Getting total count from:', countUrl);
           
           const countResponse = await fetch(countUrl, {
             headers: {
@@ -404,18 +441,32 @@ serve(async (req) => {
             signal: AbortSignal.timeout(30000)
           });
 
+          console.log('📊 Count response status:', countResponse.status);
+          console.log('📊 Count response headers:', Object.fromEntries(countResponse.headers.entries()));
+
           if (!countResponse.ok) {
             const errorText = await countResponse.text();
             console.error(`❌ Count request failed: ${countResponse.status} - ${errorText}`);
-            throw new Error(`Authentication failed: Invalid credentials or WooCommerce API not accessible (${countResponse.status})`);
+            await addLog(supabaseClient, 'ERROR', 'WOOCOMMERCE', 'Falha na requisição de contagem', { 
+              status: countResponse.status, 
+              error: errorText,
+              url: countUrl 
+            });
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: `Falha na autenticação com WooCommerce: ${countResponse.status} - ${errorText}` 
+            }), {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
           }
 
           const totalProducts = parseInt(countResponse.headers.get('X-WP-Total') || '0');
-          console.log('Total products from WooCommerce header:', totalProducts);
+          console.log('📊 Total products from WooCommerce header:', totalProducts);
           
           // Fetch products with pagination
           const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=${per_page}&page=${page}&status=publish`;
-          console.log('Fetching products from:', productUrl);
+          console.log('🛍️ Fetching products from:', productUrl);
           
           const response = await fetch(productUrl, {
             headers: {
@@ -425,32 +476,60 @@ serve(async (req) => {
             signal: AbortSignal.timeout(30000)
           });
 
+          console.log('🛍️ Products response status:', response.status);
+          console.log('🛍️ Products response headers:', Object.fromEntries(response.headers.entries()));
+
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`❌ Products request failed: ${response.status} - ${errorText}`);
-            throw new Error(`Failed to fetch products: Invalid credentials or API error (${response.status})`);
+            await addLog(supabaseClient, 'ERROR', 'WOOCOMMERCE', 'Falha na busca de produtos', { 
+              status: response.status, 
+              error: errorText,
+              url: productUrl 
+            });
+            return new Response(JSON.stringify({ 
+              success: false, 
+              error: `Falha ao buscar produtos: ${response.status} - ${errorText}` 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
           }
 
+          console.log('✅ Products response received successfully');
           const productsData = await response.json();
+          console.log('🔍 Processing products data...');
+          console.log('- Products data type:', typeof productsData);
+          console.log('- Is array:', Array.isArray(productsData));
+          console.log('- Products count:', Array.isArray(productsData) ? productsData.length : 'N/A');
           
-          const products = Array.isArray(productsData) ? productsData.map(product => ({
-            id: product.id,
-            name: product.name,
-            sku: product.sku || `PRODUCT-${product.id}`,
-            price: parseFloat(product.regular_price || product.price || '0'),
-            salePrice: product.sale_price ? parseFloat(product.sale_price) : null,
-            image: product.images && product.images.length > 0 ? product.images[0].src : null,
-            stock: product.stock_quantity || 0,
-            category: product.categories && product.categories.length > 0 ? product.categories[0].name : 'Sem categoria',
-            status: product.status,
-            description: product.description || product.short_description || '',
-            permalink: product.permalink,
-            currency: 'MXN' // Default currency
-          })) : [];
+          const products = Array.isArray(productsData) ? productsData.map((product, index) => {
+            console.log(`📦 Processing product ${index + 1}:`, {
+              id: product.id,
+              name: product.name?.substring(0, 50) + '...',
+              sku: product.sku,
+              price: product.regular_price || product.price
+            });
+            
+            return {
+              id: product.id,
+              name: product.name,
+              sku: product.sku || `PRODUCT-${product.id}`,
+              price: parseFloat(product.regular_price || product.price || '0'),
+              salePrice: product.sale_price ? parseFloat(product.sale_price) : null,
+              image: product.images && product.images.length > 0 ? product.images[0].src : null,
+              stock: product.stock_quantity || 0,
+              category: product.categories && product.categories.length > 0 ? product.categories[0].name : 'Sem categoria',
+              status: product.status,
+              description: product.description || product.short_description || '',
+              permalink: product.permalink,
+              currency: 'MXN' // Default currency
+            };
+          }) : [];
 
-          console.log(`Successfully fetched ${products.length} products`);
-
-          return new Response(JSON.stringify({
+          console.log(`✅ Successfully processed ${products.length} products`);
+          
+          const responseData = {
             success: true,
             products: products,
             storeInfo: {
@@ -460,17 +539,38 @@ serve(async (req) => {
               apiUsed: productUrl,
               currency: 'MXN'
             }
-          }), {
+          };
+          
+          console.log('📤 Sending response with data:', {
+            success: responseData.success,
+            productsCount: responseData.products.length,
+            storeInfo: responseData.storeInfo
+          });
+          
+          await addLog(supabaseClient, 'SUCCESS', 'WOOCOMMERCE', `Produtos carregados com sucesso - Página ${page}`, { 
+            productsCount: products.length,
+            totalProducts: totalProducts,
+            page: page 
+          });
+
+          return new Response(JSON.stringify(responseData), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
 
         } catch (error) {
-          console.error('❌ Error fetching products:', error);
+          console.error('❌ Fatal error in fetch_products:', error);
           console.error('❌ Error stack:', error.stack);
           console.error('❌ Error message:', error.message);
+          
+          await addLog(supabaseClient, 'ERROR', 'WOOCOMMERCE', 'Erro fatal na busca de produtos', { 
+            error: error.message,
+            stack: error.stack,
+            page: requestBody.page || 1
+          });
+
           return new Response(JSON.stringify({
             success: false,
-            error: 'Erro ao buscar produtos: ' + error.message
+            error: `Erro interno: ${error.message}`
           }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
