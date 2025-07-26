@@ -1,0 +1,1 @@
+DELETE FROM integrations WHERE platform = 'shopify' AND store_name = 'Test Store';
