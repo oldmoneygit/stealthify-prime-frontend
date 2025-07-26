@@ -276,9 +276,12 @@ serve(async (req) => {
 
       // Add camouflage image if provided
       if (product.camouflageImage) {
+        // Extract base64 content without the data URL prefix
+        const base64Content = product.camouflageImage.split(',')[1]
         shopifyProductData.product.images = [{
-          attachment: product.camouflageImage
+          attachment: base64Content
         }]
+        console.log('Adding image with base64 length:', base64Content.length)
       }
 
       console.log('Shopify product data:', JSON.stringify(shopifyProductData, null, 2))

@@ -112,13 +112,17 @@ const Importer = () => {
         
         setProducts(data.products)
         setStoreInfo(data.storeInfo)
-        setTotalProducts(data.storeInfo.totalProducts)
+        setTotalProducts(data.storeInfo.totalProducts || data.products.length)
         setCurrentPage(page)
         setHasWooCommerceConnection(true)
         
+        console.log('Total products received:', data.storeInfo.totalProducts)
+        console.log('Products length:', data.products.length)
+        console.log('Total pages calculated:', Math.ceil((data.storeInfo.totalProducts || data.products.length) / productsPerPage))
+        
         toast({
           title: "Produtos carregados!",
-          description: `${data.products.length} produtos encontrados (página ${page})`,
+          description: `${data.products.length} produtos encontrados (página ${page} de ${Math.ceil((data.storeInfo.totalProducts || data.products.length) / productsPerPage)})`,
         })
       } else {
         setHasWooCommerceConnection(false)
@@ -318,7 +322,7 @@ const Importer = () => {
     fetchProducts(page)
   }
 
-  const totalPages = Math.ceil(totalProducts / productsPerPage)
+  const totalPages = totalProducts > 0 ? Math.ceil(totalProducts / productsPerPage) : 1
 
   return (
     <div className="space-y-8">

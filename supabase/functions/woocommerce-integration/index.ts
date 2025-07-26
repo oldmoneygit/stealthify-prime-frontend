@@ -321,6 +321,7 @@ serve(async (req) => {
           }
 
           const totalProducts = parseInt(countResponse.headers.get('X-WP-Total') || '0');
+          console.log('Total products from WooCommerce header:', totalProducts);
           
           // Fetch products with pagination
           const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=${per_page}&page=${page}&status=publish`;
