@@ -12,11 +12,12 @@ export interface Integration {
 }
 
 export function useIntegrations() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingShopify, setIsLoadingShopify] = useState(false);
+  const [isLoadingWooCommerce, setIsLoadingWooCommerce] = useState(false);
   const { toast } = useToast();
 
   const testShopifyConnection = async (shopUrl: string, accessToken: string) => {
-    setIsLoading(true);
+    setIsLoadingShopify(true);
     try {
       const { data, error } = await supabase.functions.invoke('shopify-integration', {
         body: {
@@ -51,12 +52,12 @@ export function useIntegrations() {
       });
       return { success: false, error: 'Connection failed' };
     } finally {
-      setIsLoading(false);
+      setIsLoadingShopify(false);
     }
   };
 
   const testWooCommerceConnection = async (storeUrl: string, consumerKey: string, consumerSecret: string) => {
-    setIsLoading(true);
+    setIsLoadingWooCommerce(true);
     try {
       console.log('Testing WooCommerce connection with:', { storeUrl, consumerKey: consumerKey.substring(0, 5) + '***' });
       
@@ -99,12 +100,12 @@ export function useIntegrations() {
       });
       return { success: false, error: 'Connection failed' };
     } finally {
-      setIsLoading(false);
+      setIsLoadingWooCommerce(false);
     }
   };
 
   const saveShopifyIntegration = async (storeName: string, shopUrl: string, accessToken: string) => {
-    setIsLoading(true);
+    setIsLoadingShopify(true);
     try {
       const { data, error } = await supabase.functions.invoke('shopify-integration', {
         body: {
@@ -140,12 +141,12 @@ export function useIntegrations() {
       });
       return { success: false, error: 'Save failed' };
     } finally {
-      setIsLoading(false);
+      setIsLoadingShopify(false);
     }
   };
 
   const saveWooCommerceIntegration = async (storeName: string, storeUrl: string, consumerKey: string, consumerSecret: string) => {
-    setIsLoading(true);
+    setIsLoadingWooCommerce(true);
     try {
       const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
         body: {
@@ -182,7 +183,7 @@ export function useIntegrations() {
       });
       return { success: false, error: 'Save failed' };
     } finally {
-      setIsLoading(false);
+      setIsLoadingWooCommerce(false);
     }
   };
 
@@ -203,7 +204,8 @@ export function useIntegrations() {
   };
 
   return {
-    isLoading,
+    isLoadingShopify,
+    isLoadingWooCommerce,
     testShopifyConnection,
     testWooCommerceConnection,
     saveShopifyIntegration,

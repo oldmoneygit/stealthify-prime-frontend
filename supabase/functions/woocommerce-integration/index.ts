@@ -192,7 +192,7 @@ serve(async (req) => {
       }
 
       case 'save': {
-        const { storeName, storeUrl, consumerKey, consumerSecret } = body;
+        const { storeName, storeUrl, consumerKey, consumerSecret } = requestBody;
         
         console.log(`Saving WooCommerce integration for user ${demoUserId}`);
 

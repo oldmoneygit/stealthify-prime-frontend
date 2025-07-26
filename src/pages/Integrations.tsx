@@ -22,7 +22,8 @@ import {
 const Integrations = () => {
   const { toast } = useToast()
   const {
-    isLoading,
+    isLoadingShopify,
+    isLoadingWooCommerce,
     testShopifyConnection,
     testWooCommerceConnection,
     saveShopifyIntegration,
@@ -346,18 +347,18 @@ const Integrations = () => {
             <Button 
               onClick={() => handleSave('shopify')}
               className="bg-gradient-primary hover:shadow-glow"
-              disabled={isLoading}
+              disabled={isLoadingShopify}
             >
               <Zap className="w-4 h-4 mr-2" />
-              {isLoading ? "Salvando..." : "Salvar Shopify"}
+              {isLoadingShopify ? "Salvando..." : "Salvar Shopify"}
             </Button>
             <Button 
               variant="outline"
               onClick={() => testConnection('shopify')}
-              disabled={isLoading}
+              disabled={isLoadingShopify}
             >
               <TestTube className="w-4 h-4 mr-2" />
-              {isLoading ? "Testando..." : "Testar Conexão"}
+              {isLoadingShopify ? "Testando..." : "Testar Conexão"}
             </Button>
           </div>
         </CardContent>
@@ -479,18 +480,18 @@ const Integrations = () => {
             <Button 
               onClick={() => handleSave('woocommerce')}
               className="bg-gradient-primary hover:shadow-glow"
-              disabled={isLoading}
+              disabled={isLoadingWooCommerce}
             >
               <Zap className="w-4 h-4 mr-2" />
-              {isLoading ? "Salvando..." : "Salvar WooCommerce"}
+              {isLoadingWooCommerce ? "Salvando..." : "Salvar WooCommerce"}
             </Button>
             <Button 
               variant="outline"
               onClick={() => testConnection('woocommerce')}
-              disabled={isLoading}
+              disabled={isLoadingWooCommerce}
             >
               <TestTube className="w-4 h-4 mr-2" />
-              {isLoading ? "Testando..." : "Testar Conexão"}
+              {isLoadingWooCommerce ? "Testando..." : "Testar Conexão"}
             </Button>
           </div>
         </CardContent>
