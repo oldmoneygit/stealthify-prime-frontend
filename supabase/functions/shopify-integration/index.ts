@@ -24,16 +24,22 @@ interface ShopifyProduct {
 }
 
 serve(async (req) => {
+  console.log('🚀 Shopify Integration function called - Method:', req.method)
+  
   if (req.method === 'OPTIONS') {
+    console.log('🔄 Handling OPTIONS request')
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    console.log('📡 Creating Supabase client...')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+    console.log('✅ Supabase client created')
 
+    console.log('📝 Parsing request body...')
     const { action, ...requestData } = await req.json()
     console.log('Shopify Integration - Action:', action)
     console.log('Request data:', requestData)
