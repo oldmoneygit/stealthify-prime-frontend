@@ -192,7 +192,16 @@ const Integrations = () => {
 
   const testConnection = async (platform: 'shopify' | 'woocommerce') => {
     if (platform === 'shopify') {
-      // For Shopify, we need either new credentials or to be in edit mode
+      // Check if we have saved integration
+      const hasIntegration = shopifyIntegrations.length > 0;
+      
+      if (hasIntegration && !editMode.shopify) {
+        // Test with saved credentials
+        await testWithSavedCredentials('shopify');
+        return;
+      }
+      
+      // Test with form data for new connections
       const shopifyUrl = formData.shopifyUrl;
       const shopifyToken = formData.shopifyToken;
       
@@ -214,10 +223,18 @@ const Integrations = () => {
         return
       }
       
-      // Test Shopify connection
       await testShopifyConnection(shopifyUrl, shopifyToken)
     } else {
-      // WooCommerce - check if we should use form data or modal data
+      // WooCommerce logic
+      const hasIntegration = wooCommerceIntegrations.length > 0;
+      
+      if (hasIntegration && !editMode.woocommerce) {
+        // Test with saved credentials
+        await testWithSavedCredentials('woocommerce');
+        return;
+      }
+      
+      // Test with form data for new connections or edit mode
       const useModalData = editModal.woocommerce;
       const testData = useModalData ? modalData : formData;
       
@@ -243,15 +260,12 @@ const Integrations = () => {
         source: useModalData ? 'modal' : 'form'
       });
       
-      // For WooCommerce, testing will automatically save if successful
       const result = await testWooCommerceConnection(wooUrl, wooKey, wooSecret, wooStoreName)
       if (result.success) {
-        // Reload integrations after successful save
         const wooCommerceData = await getIntegrations('woocommerce')
         setWooCommerceIntegrations(wooCommerceData)
         setEditMode(prev => ({ ...prev, woocommerce: false }))
         
-        // Clear sensitive data from both form and modal
         setFormData(prev => ({ ...prev, wooKey: "", wooSecret: "" }))
         if (useModalData) {
           closeEditModal('woocommerce')
@@ -456,6 +470,40 @@ const Integrations = () => {
           toast({
             title: "Conexão bem-sucedida!",
             description: `Conectado à loja: ${data.shopInfo?.name || integrations[0].storeUrl}`,
+          });
+        } else {
+          toast({
+            title: "Erro na conexão",
+            description: data.error,
+            variant: "destructive",
+          });
+        }
+      }
+    } else {
+      // For WooCommerce
+      const integrations = await getIntegrations('woocommerce')
+      if (integrations.length > 0) {
+        // Call edge function to test with saved credentials
+        const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
+          body: {
+            action: 'test_saved',
+            integrationId: integrations[0].id
+          }
+        });
+
+        if (error) {
+          toast({
+            title: "Erro na conexão",
+            description: "Falha ao testar conexão com credenciais salvas",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (data.success) {
+          toast({
+            title: "Conexão bem-sucedida!",
+            description: `Conectado à loja: ${data.storeInfo?.name || integrations[0].storeUrl}`,
           });
         } else {
           toast({

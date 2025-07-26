@@ -170,6 +170,67 @@ serve(async (req) => {
         });
       }
 
+      case 'test_saved': {
+        console.log('🔍 Processing test_saved action');
+        const { integrationId } = requestBody;
+        
+        if (!integrationId) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: 'Integration ID is required'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get integration from database
+        const { data: integrationData, error: integrationError } = await supabaseClient
+          .from('integrations')
+          .select('*')
+          .eq('id', integrationId)
+          .eq('platform', 'woocommerce')
+          .eq('is_active', true)
+          .single();
+
+        if (integrationError || !integrationData) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Integration not found or inactive'
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Decrypt credentials
+        const { data: decryptedCredentials, error: decryptError } = await supabaseClient.rpc(
+          'decrypt_integration_credentials',
+          { encrypted_data: integrationData.encrypted_credentials }
+        );
+        
+        if (decryptError) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Failed to decrypt credentials'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const credentials = JSON.parse(decryptedCredentials);
+        const testResult = await testWooCommerceConnection(
+          credentials.storeUrl, 
+          credentials.consumerKey, 
+          credentials.consumerSecret
+        );
+        
+        return new Response(JSON.stringify(testResult), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       case 'save': {
         console.log('🚀 Processing save action');
         const { storeName, storeUrl, consumerKey, consumerSecret } = requestBody;
