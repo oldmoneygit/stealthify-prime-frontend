@@ -308,12 +308,14 @@ serve(async (req) => {
       
       // Get Shopify credentials
       console.log('Fetching Shopify integration...')
+      const demoUserId = '00000000-0000-0000-0000-000000000001';
       const { data: integrations, error: integrationsError } = await supabaseClient
         .from('integrations')
         .select('*')
         .eq('platform', 'shopify')
+        .eq('user_id', demoUserId)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
 
       console.log('Integration found:', !!integrations, 'Error:', integrationsError)
 
