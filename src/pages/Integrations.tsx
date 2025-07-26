@@ -150,16 +150,32 @@ const Integrations = () => {
 
   const testConnection = async (platform: 'shopify' | 'woocommerce') => {
     if (platform === 'shopify') {
-      if (!formData.shopifyUrl || !formData.shopifyToken) {
+      // Check if we have saved credentials and form fields are empty
+      const hasShopifyIntegration = shopifyIntegrations.length > 0;
+      const shopifyUrl = formData.shopifyUrl || (hasShopifyIntegration ? shopifyIntegrations[0].storeUrl : '');
+      const shopifyToken = formData.shopifyToken;
+      
+      if (!shopifyUrl || (!shopifyToken && !hasShopifyIntegration)) {
         toast({
           title: "Campos obrigatórios",
-          description: "Preencha URL e Token do Shopify para testar",
+          description: "Para testar uma nova configuração, preencha URL e Token do Shopify",
           variant: "destructive"
         })
         return
       }
+      
+      // If testing existing integration without token, show info message
+      if (!shopifyToken && hasShopifyIntegration) {
+        toast({
+          title: "Teste com credenciais salvas",
+          description: "Para testar com novas credenciais, clique em 'Editar Credenciais' primeiro",
+          variant: "default"
+        })
+        return
+      }
+      
       // For Shopify, just test the connection without saving
-      await testShopifyConnection(formData.shopifyUrl, formData.shopifyToken)
+      await testShopifyConnection(shopifyUrl, shopifyToken)
     } else {
       if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret || !formData.wooStoreName) {
         toast({
