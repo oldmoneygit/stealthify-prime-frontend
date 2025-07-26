@@ -239,31 +239,49 @@ serve(async (req) => {
       }
 
       case 'list': {
-        const { data, error } = await supabaseClient
-          .from('user_integrations')
-          .select('*')
-          .eq('user_id', demoUserId)
-          .eq('integration_type', 'woocommerce');
+        console.log('Processing list action for user:', demoUserId);
+        
+        try {
+          const { data, error } = await supabaseClient
+            .from('user_integrations')
+            .select('*')
+            .eq('user_id', demoUserId)
+            .eq('integration_type', 'woocommerce');
 
-        if (error) {
-          return new Response(JSON.stringify({ error: 'Failed to fetch integrations' }), {
+          console.log('Database query result:', { data, error });
+
+          if (error) {
+            console.error('Database error in list action:', error);
+            return new Response(JSON.stringify({ error: 'Failed to fetch integrations', details: error.message }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          const integrations = data?.map(integration => ({
+            id: integration.id,
+            storeName: integration.store_name,
+            storeUrl: integration.store_url,
+            status: integration.status,
+            lastSync: integration.last_sync_at,
+            errorMessage: integration.error_message
+          })) || [];
+
+          console.log('Returning integrations:', integrations);
+
+          return new Response(JSON.stringify({ integrations }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (listError) {
+          console.error('Exception in list action:', listError);
+          return new Response(JSON.stringify({ 
+            error: 'Failed to process list request', 
+            details: listError.message 
+          }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-
-        const integrations = data.map(integration => ({
-          id: integration.id,
-          storeName: integration.store_name,
-          storeUrl: integration.store_url,
-          status: integration.status,
-          lastSync: integration.last_sync_at,
-          errorMessage: integration.error_message
-        }));
-
-        return new Response(JSON.stringify({ integrations }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
       }
 
       default:
