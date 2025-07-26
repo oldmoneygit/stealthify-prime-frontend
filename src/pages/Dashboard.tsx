@@ -91,19 +91,19 @@ const Dashboard = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-2">
             Visão geral da sua operação STEALTHIFY.AI
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-2 bg-card rounded-lg border">
             <div className="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
             <span className="text-sm text-muted-foreground">Sistema Online</span>
           </div>
-          <Button className="bg-gradient-primary hover:shadow-glow">
+          <Button className="bg-gradient-primary hover:shadow-glow w-full sm:w-auto">
             <Zap className="w-4 h-4 mr-2" />
             Importar Agora
           </Button>
@@ -244,22 +244,22 @@ const Dashboard = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
-              <ShoppingCart className="w-5 h-5" />
-              <span className="text-sm">Sincronizar Produtos</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Button variant="outline" className="h-16 sm:h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
+              <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="text-xs sm:text-sm">Sincronizar Produtos</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
-              <Package className="w-5 h-5" />
-              <span className="text-sm">Verificar Estoque</span>
+            <Button variant="outline" className="h-16 sm:h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
+              <Package className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="text-xs sm:text-sm">Verificar Estoque</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
-              <Zap className="w-5 h-5" />
-              <span className="text-sm">Executar Backup</span>
+            <Button variant="outline" className="h-16 sm:h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
+              <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="text-xs sm:text-sm">Executar Backup</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
-              <Activity className="w-5 h-5" />
-              <span className="text-sm">Relatórios</span>
+            <Button variant="outline" className="h-16 sm:h-20 flex-col gap-2 hover:bg-accent/10 hover:border-accent">
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="text-xs sm:text-sm">Relatórios</span>
             </Button>
           </div>
         </CardContent>

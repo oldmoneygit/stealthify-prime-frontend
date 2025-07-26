@@ -418,11 +418,11 @@ const Importer = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Importador de Produtos</h1>
-          <div className="flex items-center gap-4 mt-2">
-            <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Importador de Produtos</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
+            <p className="text-sm sm:text-base text-muted-foreground">
               Selecione produtos do WooCommerce para importar e camuflar na Shopify
             </p>
             {storeInfo && (
@@ -437,11 +437,12 @@ const Importer = () => {
           <Button 
             onClick={refreshProducts}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 w-full sm:w-auto"
             disabled={isLoadingProducts}
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingProducts ? 'animate-spin' : ''}`} />
-            {isLoadingProducts ? 'Carregando...' : 'Atualizar Lista'}
+            <span className="hidden sm:inline">{isLoadingProducts ? 'Carregando...' : 'Atualizar Lista'}</span>
+            <span className="sm:hidden">{isLoadingProducts ? 'Carregando...' : 'Atualizar'}</span>
           </Button>
         </div>
       </div>
@@ -485,7 +486,7 @@ const Importer = () => {
       )}
 
       {/* Import Configuration */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="lg:col-span-1 bg-card/95 backdrop-blur-sm border-border/50 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

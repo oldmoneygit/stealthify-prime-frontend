@@ -26,7 +26,7 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left side - Hero Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img 
@@ -67,29 +67,29 @@ const Login = () => {
       </div>
 
       {/* Right side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gradient-stealth">
-        <div className="w-full max-w-md space-y-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 bg-gradient-stealth min-h-screen lg:min-h-0">
+        <div className="w-full max-w-md space-y-6 sm:space-y-8">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Shield className="w-6 h-6 text-primary-foreground" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">STEALTHIFY</h1>
-                <p className="text-accent text-sm font-semibold">.AI</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground">STEALTHIFY</h1>
+                <p className="text-accent text-xs sm:text-sm font-semibold">.AI</p>
               </div>
             </div>
           </div>
 
           <Card className="shadow-card border-border/50 bg-card/95 backdrop-blur-sm">
-            <CardHeader className="space-y-1 text-center">
-              <CardTitle className="text-2xl font-bold">Bem-vindo de volta</CardTitle>
-              <CardDescription>
+            <CardHeader className="space-y-1 text-center p-4 sm:p-6">
+              <CardTitle className="text-xl sm:text-2xl font-bold">Bem-vindo de volta</CardTitle>
+              <CardDescription className="text-sm sm:text-base">
                 Entre na sua conta para acessar a plataforma
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -178,7 +178,7 @@ const Login = () => {
             <p className="text-xs text-muted-foreground">
               Plataforma confiada por mais de 1000+ empresários
             </p>
-            <div className="flex justify-center gap-6 text-xs text-muted-foreground">
+            <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-6 text-xs text-muted-foreground">
               <span>✓ Integração WooCommerce</span>
               <span>✓ Shopify Payments Seguro</span>
               <span>✓ Camuflagem Automática</span>

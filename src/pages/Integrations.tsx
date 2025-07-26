@@ -520,27 +520,27 @@ const Integrations = () => {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Integrações</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Integrações</h1>
+        <p className="text-sm sm:text-base text-muted-foreground mt-2">
           Configure as conexões com Shopify e WooCommerce
         </p>
       </div>
 
       {/* Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card className="bg-card/95 backdrop-blur-sm border-border/50 shadow-card">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
-                  <ShoppingBag className="w-5 h-5 text-primary-foreground" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                  <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">Shopify</CardTitle>
-                  <CardDescription>Plataforma de checkout</CardDescription>
+                  <CardTitle className="text-base sm:text-lg">Shopify</CardTitle>
+                  <CardDescription className="text-sm">Plataforma de checkout</CardDescription>
                 </div>
               </div>
-              <Badge variant={getShopifyStatus().connected ? "default" : "destructive"} className="bg-accent">
+              <Badge variant={getShopifyStatus().connected ? "default" : "destructive"} className="bg-accent self-start sm:self-center">
                 {getShopifyStatus().connected ? (
                   <><CheckCircle className="w-3 h-3 mr-1" /> Conectado</>
                 ) : (
@@ -550,7 +550,7 @@ const Integrations = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="text-sm">
+            <div className="text-sm break-all">
               <span className="text-muted-foreground">URL: </span>
               <span className="text-foreground">{getShopifyStatus().url}</span>
             </div>
@@ -563,17 +563,17 @@ const Integrations = () => {
 
         <Card className="bg-card/95 backdrop-blur-sm border-border/50 shadow-card">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center">
-                  <Settings className="w-5 h-5 text-secondary-foreground" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-lg flex items-center justify-center">
+                  <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-secondary-foreground" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">WooCommerce</CardTitle>
-                  <CardDescription>Vitrine de produtos</CardDescription>
+                  <CardTitle className="text-base sm:text-lg">WooCommerce</CardTitle>
+                  <CardDescription className="text-sm">Vitrine de produtos</CardDescription>
                 </div>
               </div>
-              <Badge variant={getWooCommerceStatus().connected ? "default" : "destructive"} className="bg-accent">
+              <Badge variant={getWooCommerceStatus().connected ? "default" : "destructive"} className="bg-accent self-start sm:self-center">
                 {getWooCommerceStatus().connected ? (
                   <><CheckCircle className="w-3 h-3 mr-1" /> Conectado</>
                 ) : (
@@ -583,7 +583,7 @@ const Integrations = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="text-sm">
+            <div className="text-sm break-all">
               <span className="text-muted-foreground">URL: </span>
               <span className="text-foreground">{getWooCommerceStatus().url}</span>
             </div>
