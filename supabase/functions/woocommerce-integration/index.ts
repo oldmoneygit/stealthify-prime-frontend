@@ -177,25 +177,37 @@ serve(async (req) => {
 
     switch (action) {
       case 'test': {
+        console.log('Processing test action');
         const { storeUrl, consumerKey, consumerSecret } = body;
         
-        console.log(`Testing WooCommerce connection for user ${demoUserId}`);
+        console.log(`Testing WooCommerce connection for user ${demoUserId} with URL: ${storeUrl}`);
         
-        const testResult = await testWooCommerceConnection(storeUrl, consumerKey, consumerSecret);
-        
-        await logAction(
-          supabaseClient,
-          demoUserId,
-          null,
-          'test_connection',
-          testResult.success ? 'success' : 'error',
-          testResult.success ? 'WooCommerce connection test successful' : testResult.error!,
-          { storeUrl, storeInfo: testResult.storeInfo }
-        );
+        try {
+          const testResult = await testWooCommerceConnection(storeUrl, consumerKey, consumerSecret);
+          console.log('Test result:', testResult);
+          
+          await logAction(
+            supabaseClient,
+            demoUserId,
+            null,
+            'test_connection',
+            testResult.success ? 'success' : 'error',
+            testResult.success ? 'WooCommerce connection test successful' : testResult.error!,
+            { storeUrl, storeInfo: testResult.storeInfo }
+          );
 
-        return new Response(JSON.stringify(testResult), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+          return new Response(JSON.stringify(testResult), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (testError) {
+          console.error('Error in test case:', testError);
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: `Test failed: ${testError.message}` 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
 
       case 'save': {
