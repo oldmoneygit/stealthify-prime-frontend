@@ -87,9 +87,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    // For public access, we'll use a demo user ID
-    // In production, you'd implement proper authentication
-    const demoUserId = 'demo-user-' + Date.now().toString();
+    // For public access, we'll use a fixed demo user UUID
+    const demoUserId = '00000000-0000-0000-0000-000000000001';
 
     let requestBody;
     try {
