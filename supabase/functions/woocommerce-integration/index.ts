@@ -104,6 +104,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('WooCommerce integration function called with method:', req.method);
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -113,7 +115,19 @@ serve(async (req) => {
     // In production, you'd implement proper authentication
     const demoUserId = 'demo-user-' + Date.now().toString();
 
-    const { action, ...body } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('Request body parsed:', requestBody);
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { action, ...body } = requestBody;
 
     switch (action) {
       case 'test': {
@@ -260,7 +274,11 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('WooCommerce integration error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    console.error('Error stack:', error.stack);
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error', 
+      details: error.message 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
