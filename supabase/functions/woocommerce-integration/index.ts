@@ -29,8 +29,34 @@ function decrypt(encryptedText: string, key: string): string {
 
 async function testWooCommerceConnection(storeUrl: string, consumerKey: string, consumerSecret: string): Promise<{ success: boolean; error?: string; storeInfo?: any }> {
   try {
+    console.log('Testing WooCommerce connection with:', { storeUrl, consumerKey: consumerKey.substring(0, 5) + '***' });
+    
     const cleanUrl = storeUrl.replace(/\/$/, '');
-    const apiUrl = `${cleanUrl}/wp-json/wc/v3/system_status`;
+    
+    // First, try to check if WooCommerce REST API is available
+    const apiCheckUrl = `${cleanUrl}/wp-json/wc/v3`;
+    
+    console.log('Checking API availability at:', apiCheckUrl);
+    
+    const apiCheckResponse = await fetch(apiCheckUrl, {
+      method: 'HEAD',
+      headers: {
+        'User-Agent': 'WooCommerce-Integration-Test/1.0',
+      },
+    });
+    
+    console.log('API check response status:', apiCheckResponse.status);
+    
+    if (!apiCheckResponse.ok && apiCheckResponse.status !== 401) {
+      return {
+        success: false,
+        error: `WooCommerce REST API não está disponível nesta URL. Verifique se o WooCommerce está instalado e a API REST está ativada.`
+      };
+    }
+    
+    // Test with products endpoint (simpler than system_status)
+    const apiUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=1`;
+    console.log('Testing with products endpoint:', apiUrl);
     
     // Create basic auth header
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
@@ -39,47 +65,68 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
       headers: {
         'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',
+        'User-Agent': 'WooCommerce-Integration-Test/1.0',
       },
     });
+
+    console.log('API response status:', response.status);
+    console.log('API response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
-      return {
-        success: false,
-        error: `WooCommerce API Error (${response.status}): ${errorText}`
-      };
+      console.log('API error response:', errorText);
+      
+      if (response.status === 401) {
+        return {
+          success: false,
+          error: `Credenciais inválidas. Verifique se o Consumer Key e Consumer Secret estão corretos.`
+        };
+      } else if (response.status === 404) {
+        return {
+          success: false,
+          error: `WooCommerce REST API não encontrada. Verifique se o WooCommerce está instalado e a API está ativada.`
+        };
+      } else {
+        // Check if the response is HTML (common when there's a server error)
+        if (errorText.includes('<!DOCTYPE') || errorText.includes('<html')) {
+          return {
+            success: false,
+            error: `Erro do servidor: A URL está retornando uma página HTML em vez da API. Verifique se a URL está correta e se o WooCommerce está configurado adequadamente.`
+          };
+        }
+        
+        return {
+          success: false,
+          error: `Erro da API WooCommerce (${response.status}): ${errorText.substring(0, 200)}`
+        };
+      }
     }
 
     const data = await response.json();
+    console.log('API response data:', data);
     
-    // Also test products endpoint to ensure we have the right permissions
-    const productsResponse = await fetch(`${cleanUrl}/wp-json/wc/v3/products?per_page=1`, {
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!productsResponse.ok) {
-      return {
-        success: false,
-        error: `WooCommerce Products API Error (${productsResponse.status}): Insufficient permissions`
-      };
-    }
-
     return {
       success: true,
       storeInfo: {
-        environment: data.environment,
-        database: data.database,
-        activePlugins: data.active_plugins?.length || 0,
-        theme: data.theme?.name
+        storeUrl: cleanUrl,
+        productsCount: Array.isArray(data) ? data.length : 0,
+        apiVersion: 'v3',
+        status: 'connected'
       }
     };
   } catch (error) {
+    console.error('WooCommerce connection error:', error);
+    
+    if (error.message.includes('fetch')) {
+      return {
+        success: false,
+        error: `Erro de conexão: Não foi possível conectar à URL fornecida. Verifique se a URL está correta e acessível.`
+      };
+    }
+    
     return {
       success: false,
-      error: `Connection Error: ${error.message}`
+      error: `Erro de conexão: ${error.message}`
     };
   }
 }
