@@ -268,10 +268,14 @@ serve(async (req) => {
       }
 
       case 'fetch_products': {
-        console.log('Processing fetch_products action');
+        console.log('🔥 Processing fetch_products action');
+        console.log('Request body received:', JSON.stringify(requestBody, null, 2));
+        
         const { page = 1, per_page = 250 } = requestBody;
+        console.log('Extracted pagination:', { page, per_page });
         
         try {
+          console.log('🔍 Looking for WooCommerce integration...');
           const { data: integrationData, error: integrationError } = await supabaseClient
             .from('integrations')
             .select('*')
@@ -280,7 +284,10 @@ serve(async (req) => {
             .eq('is_active', true)
             .single();
 
+          console.log('Integration query result:', { integrationData, integrationError });
+
           if (integrationError || !integrationData) {
+            console.error('❌ No WooCommerce integration found');
             return new Response(JSON.stringify({
               success: false,
               error: 'Nenhuma integração WooCommerce conectada encontrada'
@@ -373,7 +380,9 @@ serve(async (req) => {
           });
 
         } catch (error) {
-          console.error('Error fetching products:', error);
+          console.error('❌ Error fetching products:', error);
+          console.error('❌ Error stack:', error.stack);
+          console.error('❌ Error message:', error.message);
           return new Response(JSON.stringify({
             success: false,
             error: 'Erro ao buscar produtos: ' + error.message
@@ -391,10 +400,16 @@ serve(async (req) => {
         });
     }
   } catch (error) {
-    console.error('WooCommerce integration error:', error);
+    console.error('🚨 WooCommerce integration FATAL error:', error);
+    console.error('🚨 Error name:', error.name);
+    console.error('🚨 Error message:', error.message);
+    console.error('🚨 Error stack:', error.stack);
+    console.error('🚨 Error toString:', error.toString());
+    
     return new Response(JSON.stringify({ 
       error: 'Internal server error', 
-      details: error.message 
+      details: error.message,
+      name: error.name
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
