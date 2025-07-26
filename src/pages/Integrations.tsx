@@ -160,15 +160,24 @@ const Integrations = () => {
       }
       await testShopifyConnection(formData.shopifyUrl, formData.shopifyToken)
     } else {
-      if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret) {
+      if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret || !formData.wooStoreName) {
         toast({
           title: "Campos obrigatórios",
-          description: "Preencha todos os campos do WooCommerce para testar",
+          description: "Preencha todos os campos do WooCommerce para testar e salvar",
           variant: "destructive"
         })
         return
       }
-      await testWooCommerceConnection(formData.wooUrl, formData.wooKey, formData.wooSecret)
+      // For WooCommerce, testing will automatically save if successful
+      const result = await testWooCommerceConnection(formData.wooUrl, formData.wooKey, formData.wooSecret)
+      if (result.success) {
+        // Reload integrations after successful save
+        const wooCommerceData = await getIntegrations('woocommerce')
+        setWooCommerceIntegrations(wooCommerceData)
+        setEditMode(prev => ({ ...prev, woocommerce: false }))
+        // Clear sensitive data from form
+        setFormData(prev => ({ ...prev, wooKey: "", wooSecret: "" }))
+      }
     }
   }
 
@@ -585,20 +594,13 @@ const Integrations = () => {
             {editMode.woocommerce || wooCommerceIntegrations.length === 0 ? (
               <>
                 <Button 
-                  onClick={() => handleSave('woocommerce')}
-                  className="bg-gradient-primary hover:shadow-glow"
-                  disabled={isLoadingWooCommerce}
-                >
-                  <Zap className="w-4 h-4 mr-2" />
-                  {isLoadingWooCommerce ? "Salvando..." : "Salvar WooCommerce"}
-                </Button>
-                <Button 
                   variant="outline"
                   onClick={() => testConnection('woocommerce')}
                   disabled={isLoadingWooCommerce}
+                  className="bg-gradient-primary hover:shadow-glow text-primary-foreground"
                 >
                   <TestTube className="w-4 h-4 mr-2" />
-                  {isLoadingWooCommerce ? "Testando..." : "Testar Conexão"}
+                  {isLoadingWooCommerce ? "Testando e Salvando..." : "Testar e Salvar"}
                 </Button>
                 {editMode.woocommerce && (
                   <Button 

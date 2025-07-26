@@ -80,8 +80,24 @@ export function useIntegrations() {
       if (data.success) {
         toast({
           title: "Conexão bem-sucedida!",
-          description: `Conectado à loja WooCommerce com tema: ${data.storeInfo?.theme || 'N/A'}`,
+          description: "WooCommerce conectado com sucesso. Salvando credenciais...",
         });
+        
+        // Automatically save credentials after successful test
+        const saveResult = await saveWooCommerceIntegration(
+          "Loja WooCommerce", // Default store name, can be updated later
+          storeUrl,
+          consumerKey,
+          consumerSecret
+        );
+        
+        if (saveResult.success) {
+          toast({
+            title: "Integração salva!",
+            description: "Credenciais WooCommerce salvas com sucesso.",
+          });
+        }
+        
         return { success: true, storeInfo: data.storeInfo };
       } else {
         toast({

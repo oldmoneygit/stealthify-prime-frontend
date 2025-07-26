@@ -177,16 +177,24 @@ serve(async (req) => {
 
     switch (action) {
       case 'test': {
-        console.log('TEST ACTION STARTED');
-        const { storeUrl, consumerKey, consumerSecret } = requestBody;
-        console.log('Test params:', { storeUrl, hasKey: !!consumerKey, hasSecret: !!consumerSecret });
+        console.log('Processing test action for user:', demoUserId);
+        console.log('Test params:', { storeUrl: requestBody.storeUrl, hasKey: !!requestBody.consumerKey, hasSecret: !!requestBody.consumerSecret });
         
-        // Simple test response first
-        return new Response(JSON.stringify({ 
-          success: true, 
-          message: 'Test response working',
-          storeInfo: { storeUrl, status: 'test' }
-        }), {
+        const { storeUrl, consumerKey, consumerSecret } = requestBody;
+        
+        if (!storeUrl || !consumerKey || !consumerSecret) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: 'Missing required parameters for testing'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const testResult = await testWooCommerceConnection(storeUrl, consumerKey, consumerSecret);
+        
+        return new Response(JSON.stringify(testResult), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
