@@ -55,6 +55,42 @@ export type Database = {
           },
         ]
       }
+      integrations: {
+        Row: {
+          created_at: string
+          encrypted_credentials: string
+          id: string
+          is_active: boolean
+          platform: string
+          store_name: string
+          store_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_credentials: string
+          id?: string
+          is_active?: boolean
+          platform: string
+          store_name: string
+          store_url: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_credentials?: string
+          id?: string
+          is_active?: boolean
+          platform?: string
+          store_name?: string
+          store_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_integrations: {
         Row: {
           created_at: string
@@ -102,7 +138,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      decrypt_integration_credentials: {
+        Args: { encrypted_data: string }
+        Returns: string
+      }
+      encrypt_integration_credentials: {
+        Args: { data: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
