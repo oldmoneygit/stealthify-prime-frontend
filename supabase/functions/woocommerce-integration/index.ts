@@ -269,11 +269,11 @@ serve(async (req) => {
         try {
           // Get user's WooCommerce integration
           const { data: integrationData, error: integrationError } = await supabaseClient
-            .from('user_integrations')
+            .from('integrations')
             .select('*')
             .eq('user_id', demoUserId)
-            .eq('integration_type', 'woocommerce')
-            .eq('status', 'connected')
+            .eq('platform', 'woocommerce')
+            .eq('is_active', true)
             .single();
 
           if (integrationError || !integrationData) {
@@ -287,10 +287,14 @@ serve(async (req) => {
           }
 
           // Decrypt credentials
-          const encryptionKey = demoUserId;
           let credentials;
           try {
-            const decryptedCredentials = decrypt(integrationData.encrypted_credentials, encryptionKey);
+            const { data: decryptedCredentials, error: decryptError } = await supabaseClient.rpc(
+              'decrypt_integration_credentials',
+              { encrypted_data: integrationData.encrypted_credentials }
+            );
+            
+            if (decryptError) throw new Error('Decryption failed');
             credentials = JSON.parse(decryptedCredentials);
           } catch (decryptError) {
             console.error('Failed to decrypt credentials:', decryptError);
@@ -484,26 +488,30 @@ serve(async (req) => {
           }
 
           // Encrypt credentials
-          const encryptionKey = demoUserId; // Using demo user ID as encryption key
           const credentials: WooCommerceCredentials = { storeUrl, consumerKey, consumerSecret };
-          const encryptedCredentials = encrypt(JSON.stringify(credentials), encryptionKey);
+          const { data: encryptedCredentials, error: encryptError } = await supabaseClient.rpc(
+            'encrypt_integration_credentials',
+            { data: JSON.stringify(credentials) }
+          );
+
+          if (encryptError) {
+            throw new Error('Erro ao criptografar credenciais');
+          }
 
           console.log('Attempting to save to database...');
 
           // Save to database
           const { data, error } = await supabaseClient
-            .from('user_integrations')
+            .from('integrations')
             .upsert({
               user_id: demoUserId,
-              integration_type: 'woocommerce',
+              platform: 'woocommerce',
               store_name: storeName,
               store_url: storeUrl,
               encrypted_credentials: encryptedCredentials,
-              status: 'connected',
-              last_sync_at: new Date().toISOString(),
-              error_message: null
+              is_active: true
             }, {
-              onConflict: 'user_id,integration_type,store_url'
+              onConflict: 'user_id,platform,store_url'
             })
             .select()
             .single();
@@ -550,7 +558,7 @@ serve(async (req) => {
               storeName,
               storeUrl,
               status: 'connected',
-              lastSync: data.last_sync_at
+              lastSync: data.updated_at
             }
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -572,10 +580,10 @@ serve(async (req) => {
         
         try {
           const { data, error } = await supabaseClient
-            .from('user_integrations')
+            .from('integrations')
             .select('*')
             .eq('user_id', demoUserId)
-            .eq('integration_type', 'woocommerce');
+            .eq('platform', 'woocommerce');
 
           console.log('Database query result:', { data, error });
 
@@ -591,9 +599,9 @@ serve(async (req) => {
             id: integration.id,
             storeName: integration.store_name,
             storeUrl: integration.store_url,
-            status: integration.status,
-            lastSync: integration.last_sync_at,
-            errorMessage: integration.error_message
+            status: integration.is_active ? 'connected' : 'disconnected',
+            lastSync: integration.updated_at,
+            errorMessage: null
           })) || [];
 
           console.log('Returning integrations:', integrations);

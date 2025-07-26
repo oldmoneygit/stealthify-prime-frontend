@@ -44,6 +44,156 @@ serve(async (req) => {
     console.log('Shopify Integration - Action:', action)
     console.log('Request data:', requestData)
 
+    if (action === 'test') {
+      console.log('🔍 Testing Shopify connection...')
+      const { shopUrl, accessToken } = requestData
+      
+      try {
+        // Extract shop name from URL
+        const shopName = shopUrl.replace(/^https?:\/\//, '').replace('.myshopify.com', '').replace(/\/$/, '')
+        
+        // Test connection to Shopify API
+        const testResponse = await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/shop.json`, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!testResponse.ok) {
+          const errorText = await testResponse.text()
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `Falha na autenticação: ${testResponse.status} - ${errorText}` 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        const shopInfo = await testResponse.json()
+        console.log('✅ Shopify connection test successful')
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            shopInfo: shopInfo.shop 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('❌ Shopify test error:', error)
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message || 'Erro ao testar conexão' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    if (action === 'save') {
+      console.log('💾 Saving Shopify integration...')
+      const { storeName, shopUrl, accessToken } = requestData
+      
+      try {
+        // Extract shop name from URL
+        const shopName = shopUrl.replace(/^https?:\/\//, '').replace('.myshopify.com', '').replace(/\/$/, '')
+        
+        // Encrypt credentials
+        const credentials = JSON.stringify({ shopName, accessToken })
+        const { data: encryptedCredentials, error: encryptError } = await supabaseClient.rpc(
+          'encrypt_integration_credentials',
+          { data: credentials }
+        )
+
+        if (encryptError) {
+          throw new Error('Erro ao criptografar credenciais')
+        }
+
+        // Save to database
+        const { data: integration, error: saveError } = await supabaseClient
+          .from('integrations')
+          .upsert({
+            user_id: '00000000-0000-0000-0000-000000000001', // Demo user
+            platform: 'shopify',
+            store_name: storeName,
+            store_url: shopUrl,
+            encrypted_credentials: encryptedCredentials,
+            is_active: true
+          })
+          .select()
+          .single()
+
+        if (saveError) {
+          throw new Error(`Erro ao salvar integração: ${saveError.message}`)
+        }
+
+        console.log('✅ Shopify integration saved successfully')
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            integration: integration 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('❌ Shopify save error:', error)
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message || 'Erro ao salvar integração' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    if (action === 'list') {
+      console.log('📋 Listing Shopify integrations...')
+      
+      try {
+        const { data: integrations, error: listError } = await supabaseClient
+          .from('integrations')
+          .select('*')
+          .eq('platform', 'shopify')
+          .eq('user_id', '00000000-0000-0000-0000-000000000001') // Demo user
+
+        if (listError) {
+          throw new Error(`Erro ao listar integrações: ${listError.message}`)
+        }
+
+        const formattedIntegrations = integrations.map(integration => ({
+          id: integration.id,
+          storeName: integration.store_name,
+          storeUrl: integration.store_url,
+          status: integration.is_active ? 'connected' : 'disconnected',
+          lastSync: integration.updated_at
+        }))
+
+        console.log('✅ Shopify integrations listed successfully')
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            integrations: formattedIntegrations 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        console.error('❌ Shopify list error:', error)
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message || 'Erro ao listar integrações' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     if (action === 'import_product') {
       const { product }: { product: ShopifyProduct } = requestData
       console.log('Product to import:', product.sku, product.camouflageTitle)
