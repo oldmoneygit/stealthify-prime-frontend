@@ -360,7 +360,7 @@ serve(async (req) => {
             .eq('user_id', demoUserId)
             .eq('platform', 'woocommerce')
             .eq('is_active', true)
-            .single();
+            .maybeSingle();
 
           console.log('Integration query result:', { integrationData, integrationError });
 
@@ -391,57 +391,44 @@ serve(async (req) => {
           const auth = btoa(`${credentials.consumerKey}:${credentials.consumerSecret}`);
           const cleanUrl = credentials.storeUrl.replace(/\/$/, '');
           
-          try {
-            // First, get total count for pagination
-            const countUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=1&status=publish`;
-            console.log('Getting total count from:', countUrl);
-            
-            const countResponse = await fetch(countUrl, {
-              headers: {
-                'Authorization': `Basic ${auth}`,
-                'Content-Type': 'application/json',
-              },
-              signal: AbortSignal.timeout(30000)
-            });
+          
+          // First, get total count for pagination
+          const countUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=1&status=publish`;
+          console.log('Getting total count from:', countUrl);
+          
+          const countResponse = await fetch(countUrl, {
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(30000)
+          });
 
-            if (!countResponse.ok) {
-              const errorText = await countResponse.text();
-              console.error(`❌ Count request failed: ${countResponse.status} - ${errorText}`);
-              throw new Error(`Authentication failed: Invalid credentials or WooCommerce API not accessible (${countResponse.status})`);
-            }
+          if (!countResponse.ok) {
+            const errorText = await countResponse.text();
+            console.error(`❌ Count request failed: ${countResponse.status} - ${errorText}`);
+            throw new Error(`Authentication failed: Invalid credentials or WooCommerce API not accessible (${countResponse.status})`);
+          }
 
-            const totalProducts = parseInt(countResponse.headers.get('X-WP-Total') || '0');
-            console.log('Total products from WooCommerce header:', totalProducts);
-            
-            // Fetch products with pagination
-            const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=${per_page}&page=${page}&status=publish`;
-            console.log('Fetching products from:', productUrl);
-            
-            const response = await fetch(productUrl, {
-              headers: {
-                'Authorization': `Basic ${auth}`,
-                'Content-Type': 'application/json',
-              },
-              signal: AbortSignal.timeout(30000)
-            });
+          const totalProducts = parseInt(countResponse.headers.get('X-WP-Total') || '0');
+          console.log('Total products from WooCommerce header:', totalProducts);
+          
+          // Fetch products with pagination
+          const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=${per_page}&page=${page}&status=publish`;
+          console.log('Fetching products from:', productUrl);
+          
+          const response = await fetch(productUrl, {
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(30000)
+          });
 
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(`❌ Products request failed: ${response.status} - ${errorText}`);
-              throw new Error(`Failed to fetch products: Invalid credentials or API error (${response.status})`);
-            }
-          } catch (authError) {
-            console.error(`❌ Authentication/API error: ${authError.message}`);
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                error: `Erro de autenticação: ${authError.message}` 
-              }),
-              { 
-                status: 401,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-              }
-            );
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Products request failed: ${response.status} - ${errorText}`);
+            throw new Error(`Failed to fetch products: Invalid credentials or API error (${response.status})`);
           }
 
           const productsData = await response.json();
