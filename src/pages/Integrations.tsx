@@ -158,6 +158,7 @@ const Integrations = () => {
         })
         return
       }
+      // For Shopify, just test the connection without saving
       await testShopifyConnection(formData.shopifyUrl, formData.shopifyToken)
     } else {
       if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret || !formData.wooStoreName) {
