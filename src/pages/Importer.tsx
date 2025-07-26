@@ -221,7 +221,10 @@ const Importer = () => {
             throw new Error(`Erro ao importar ${product.sku}: ${error.message}`)
           }
 
-          if (!data?.success) {
+          // Handle demo mode (when no real Shopify integration is configured)
+          if (data?.demo) {
+            console.log('Demo mode - simulating successful import')
+          } else if (!data?.success) {
             throw new Error(`Erro ao importar ${product.sku}: ${data?.error || 'Erro desconhecido'}`)
           }
           
