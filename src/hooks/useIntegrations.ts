@@ -56,7 +56,7 @@ export function useIntegrations() {
     }
   };
 
-  const testWooCommerceConnection = async (storeUrl: string, consumerKey: string, consumerSecret: string) => {
+  const testWooCommerceConnection = async (storeUrl: string, consumerKey: string, consumerSecret: string, storeName: string = "SNK HOUSE") => {
     setIsLoadingWooCommerce(true);
     try {
       console.log('Testing WooCommerce connection with:', { storeUrl, consumerKey: consumerKey.substring(0, 5) + '***' });
@@ -85,7 +85,7 @@ export function useIntegrations() {
         
         // Automatically save credentials after successful test
         const saveResult = await saveWooCommerceIntegration(
-          "SNK HOUSE", // Store name is hardcoded for now, but you can make it dynamic
+          storeName,
           storeUrl,
           consumerKey,
           consumerSecret

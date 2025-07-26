@@ -173,33 +173,32 @@ const Integrations = () => {
 
   const testConnection = async (platform: 'shopify' | 'woocommerce') => {
     if (platform === 'shopify') {
-      // Check if we have saved credentials and form fields are empty
-      const hasShopifyIntegration = shopifyIntegrations.length > 0;
-      const shopifyUrl = formData.shopifyUrl || (hasShopifyIntegration ? shopifyIntegrations[0].storeUrl : '');
+      // For Shopify, we need either new credentials or to be in edit mode
+      const shopifyUrl = formData.shopifyUrl;
       const shopifyToken = formData.shopifyToken;
       
-      if (!shopifyUrl || (!shopifyToken && !hasShopifyIntegration)) {
+      if (!shopifyUrl) {
         toast({
-          title: "Campos obrigatórios",
-          description: "Para testar uma nova configuração, preencha URL e Token do Shopify",
+          title: "Campo obrigatório",
+          description: "URL da loja Shopify é obrigatória",
           variant: "destructive"
         })
         return
       }
       
-      // If testing existing integration without token, show info message
-      if (!shopifyToken && hasShopifyIntegration) {
+      if (!shopifyToken) {
         toast({
-          title: "Teste com credenciais salvas",
-          description: "Para testar com novas credenciais, clique em 'Editar Credenciais' primeiro",
-          variant: "default"
+          title: "Campo obrigatório", 
+          description: "Access Token é obrigatório para testar a conexão",
+          variant: "destructive"
         })
         return
       }
       
-      // For Shopify, just test the connection without saving
+      // Test Shopify connection
       await testShopifyConnection(shopifyUrl, shopifyToken)
     } else {
+      // WooCommerce - validate all fields
       if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret || !formData.wooStoreName) {
         toast({
           title: "Campos obrigatórios",
@@ -208,8 +207,16 @@ const Integrations = () => {
         })
         return
       }
+      
+      console.log('Starting WooCommerce test with data:', {
+        url: formData.wooUrl,
+        storeName: formData.wooStoreName,
+        hasKey: !!formData.wooKey,
+        hasSecret: !!formData.wooSecret
+      });
+      
       // For WooCommerce, testing will automatically save if successful
-      const result = await testWooCommerceConnection(formData.wooUrl, formData.wooKey, formData.wooSecret)
+      const result = await testWooCommerceConnection(formData.wooUrl, formData.wooKey, formData.wooSecret, formData.wooStoreName)
       if (result.success) {
         // Reload integrations after successful save
         const wooCommerceData = await getIntegrations('woocommerce')
