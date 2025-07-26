@@ -263,6 +263,138 @@ serve(async (req) => {
     console.log('Action:', action);
 
     switch (action) {
+      case 'fetch_products': {
+        console.log('Processing fetch_products action for user:', demoUserId);
+        
+        try {
+          // Get user's WooCommerce integration
+          const { data: integrationData, error: integrationError } = await supabaseClient
+            .from('user_integrations')
+            .select('*')
+            .eq('user_id', demoUserId)
+            .eq('integration_type', 'woocommerce')
+            .eq('status', 'connected')
+            .single();
+
+          if (integrationError || !integrationData) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Nenhuma integração WooCommerce conectada encontrada'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          // Decrypt credentials
+          const encryptionKey = demoUserId;
+          let credentials;
+          try {
+            const decryptedCredentials = decrypt(integrationData.encrypted_credentials, encryptionKey);
+            credentials = JSON.parse(decryptedCredentials);
+          } catch (decryptError) {
+            console.error('Failed to decrypt credentials:', decryptError);
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Erro ao acessar credenciais salvas'
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          // Fetch products from WooCommerce
+          const auth = btoa(`${credentials.consumerKey}:${credentials.consumerSecret}`);
+          const cleanUrl = credentials.storeUrl.replace(/\/$/, '');
+          
+          // Try different API endpoints to find products
+          const productUrls = [
+            `${cleanUrl}/wp-json/wc/v3/products?per_page=100&status=publish`,
+            `${cleanUrl}/wp-json/wc/v2/products?per_page=100&status=publish`,
+            `${cleanUrl}/index.php/wp-json/wc/v3/products?per_page=100&status=publish`,
+          ];
+
+          let products = [];
+          let apiUsed = '';
+
+          for (const productUrl of productUrls) {
+            try {
+              console.log('Fetching products from:', productUrl);
+              const response = await fetch(productUrl, {
+                headers: {
+                  'Authorization': `Basic ${auth}`,
+                  'Content-Type': 'application/json',
+                  'User-Agent': 'WooCommerce-Product-Fetcher/1.0',
+                },
+                signal: AbortSignal.timeout(30000) // 30 second timeout
+              });
+
+              if (response.ok) {
+                const responseText = await response.text();
+                const data = JSON.parse(responseText);
+                
+                if (Array.isArray(data)) {
+                  products = data.map(product => ({
+                    id: product.id,
+                    name: product.name,
+                    sku: product.sku || `PRODUCT-${product.id}`,
+                    price: parseFloat(product.regular_price || product.price || '0'),
+                    salePrice: product.sale_price ? parseFloat(product.sale_price) : null,
+                    image: product.images && product.images.length > 0 ? product.images[0].src : null,
+                    stock: product.stock_quantity || 0,
+                    category: product.categories && product.categories.length > 0 ? product.categories[0].name : 'Sem categoria',
+                    status: product.status,
+                    description: product.description || product.short_description || '',
+                    permalink: product.permalink
+                  }));
+                  apiUsed = productUrl;
+                  break;
+                }
+              } else {
+                console.log(`Product fetch failed for ${productUrl}: ${response.status}`);
+              }
+            } catch (urlError) {
+              console.log(`Error fetching from ${productUrl}:`, urlError.message);
+            }
+          }
+
+          if (products.length === 0) {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Não foi possível buscar produtos do WooCommerce. Verifique se há produtos publicados na loja.'
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          console.log(`Successfully fetched ${products.length} products using ${apiUsed}`);
+
+          return new Response(JSON.stringify({
+            success: true,
+            products: products,
+            storeInfo: {
+              name: integrationData.store_name,
+              url: integrationData.store_url,
+              totalProducts: products.length,
+              apiUsed: apiUsed
+            }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+
+        } catch (error) {
+          console.error('Error fetching products:', error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Erro interno ao buscar produtos'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       case 'test': {
         console.log('Processing test action for user:', demoUserId);
         console.log('Test params:', { storeUrl: requestBody.storeUrl, hasKey: !!requestBody.consumerKey, hasSecret: !!requestBody.consumerSecret });

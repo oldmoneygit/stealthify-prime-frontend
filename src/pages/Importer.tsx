@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/integrations/supabase/client"
 import { 
   Upload, 
   Download, 
@@ -19,67 +20,33 @@ import {
   Image,
   Filter,
   Search,
-  RefreshCw
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from "lucide-react"
 
-// Mock products from WooCommerce
-const mockProducts = [
-  {
-    id: 1,
-    name: "Tênis Nike Air Max Replica Premium",
-    sku: "NIKE-AM-001",
-    price: 299.90,
-    salePrice: 249.90,
-    image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=100&h=100&fit=crop",
-    stock: 25,
-    category: "Calçados",
-    status: "active"
-  },
-  {
-    id: 2,
-    name: "Bolsa Louis Vuitton Inspired Collection",
-    sku: "LV-BAG-002",
-    price: 799.90,
-    salePrice: null,
-    image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=100&h=100&fit=crop",
-    stock: 12,
-    category: "Acessórios",
-    status: "active"
-  },
-  {
-    id: 3,
-    name: "Relógio Rolex Style Premium",
-    sku: "RLX-WATCH-003",
-    price: 1299.90,
-    salePrice: 999.90,
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&h=100&fit=crop",
-    stock: 8,
-    category: "Relógios",
-    status: "active"
-  },
-  {
-    id: 4,
-    name: "Perfume Chanel Inspired Fragrance",
-    sku: "CHANEL-PERF-004",
-    price: 189.90,
-    salePrice: 149.90,
-    image: "https://images.unsplash.com/photo-1541643600914-78b084683601?w=100&h=100&fit=crop",
-    stock: 30,
-    category: "Perfumes",
-    status: "active"
-  },
-  {
-    id: 5,
-    name: "Óculos Ray-Ban Aviator Style",
-    sku: "RB-AVIATOR-005",
-    price: 299.90,
-    salePrice: 199.90,
-    image: "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=100&h=100&fit=crop",
-    stock: 15,
-    category: "Óculos",
-    status: "active"
-  }
-]
+// Product interface for WooCommerce products
+interface WooProduct {
+  id: number;
+  name: string;
+  sku: string;
+  price: number;
+  salePrice: number | null;
+  image: string | null;
+  stock: number;
+  category: string;
+  status: string;
+  description: string;
+  permalink: string;
+}
+
+// Store info interface
+interface StoreInfo {
+  name: string;
+  url: string;
+  totalProducts: number;
+  apiUsed: string;
+}
 
 const Importer = () => {
   const { toast } = useToast()
@@ -89,8 +56,68 @@ const Importer = () => {
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
   const [camouflageImage, setCamouflageImage] = useState<File | null>(null)
+  
+  // Real WooCommerce product states
+  const [products, setProducts] = useState<WooProduct[]>([])
+  const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null)
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+  const [hasWooCommerceConnection, setHasWooCommerceConnection] = useState<boolean | null>(null)
 
-  const filteredProducts = mockProducts.filter(product =>
+  // Load WooCommerce products on component mount
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const fetchProducts = async () => {
+    setIsLoadingProducts(true)
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
+        body: { action: 'fetch_products' }
+      })
+
+      if (error) {
+        console.error('Error fetching products:', error)
+        setHasWooCommerceConnection(false)
+        toast({
+          title: "Erro de conexão",
+          description: "Não foi possível conectar ao WooCommerce.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      if (data.success) {
+        setProducts(data.products)
+        setStoreInfo(data.storeInfo)
+        setHasWooCommerceConnection(true)
+        
+        toast({
+          title: "Produtos carregados!",
+          description: `${data.products.length} produtos encontrados na loja ${data.storeInfo.name}`,
+        })
+      } else {
+        setHasWooCommerceConnection(false)
+        toast({
+          title: "Nenhuma integração encontrada",
+          description: data.error || "Configure uma integração WooCommerce primeiro.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error)
+      setHasWooCommerceConnection(false)
+      toast({
+        title: "Erro inesperado",
+        description: "Ocorreu um erro ao buscar produtos.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoadingProducts(false)
+    }
+  }
+
+  const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -145,8 +172,8 @@ const Importer = () => {
     setIsImporting(true)
     setImportProgress(0)
 
-    // Simulate import process
-    const selectedProductsData = mockProducts.filter(p => selectedProducts.includes(p.id))
+    // Get selected products data from real products
+    const selectedProductsData = products.filter(p => selectedProducts.includes(p.id))
     
     for (let i = 0; i < selectedProductsData.length; i++) {
       const product = selectedProductsData[i]
@@ -174,11 +201,8 @@ const Importer = () => {
     })
   }
 
-  const refreshProducts = () => {
-    toast({
-      title: "Atualizando produtos...",
-      description: "Sincronizando com WooCommerce.",
-    })
+  const refreshProducts = async () => {
+    await fetchProducts()
   }
 
   return (
@@ -187,19 +211,68 @@ const Importer = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Importador de Produtos</h1>
-          <p className="text-muted-foreground mt-2">
-            Selecione produtos do WooCommerce para importar e camuflar na Shopify
-          </p>
+          <div className="flex items-center gap-4 mt-2">
+            <p className="text-muted-foreground">
+              Selecione produtos do WooCommerce para importar e camuflar na Shopify
+            </p>
+            {storeInfo && (
+              <div className="flex items-center gap-2">
+                <Wifi className="w-4 h-4 text-accent" />
+                <span className="text-sm text-accent font-medium">{storeInfo.name}</span>
+              </div>
+            )}
+          </div>
         </div>
-        <Button 
-          onClick={refreshProducts}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Atualizar Lista
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={refreshProducts}
+            variant="outline"
+            className="flex items-center gap-2"
+            disabled={isLoadingProducts}
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingProducts ? 'animate-spin' : ''}`} />
+            {isLoadingProducts ? 'Carregando...' : 'Atualizar Lista'}
+          </Button>
+        </div>
       </div>
+
+      {/* Connection Status Alert */}
+      {hasWooCommerceConnection === false && (
+        <Card className="bg-destructive/10 border-destructive/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-destructive/20 rounded-lg flex items-center justify-center">
+                <WifiOff className="w-6 h-6 text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-medium text-destructive">WooCommerce não conectado</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Configure uma integração WooCommerce na seção de Integrações para importar produtos.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading State */}
+      {isLoadingProducts && hasWooCommerceConnection === null && (
+        <Card className="bg-card/95 backdrop-blur-sm border-border/50 shadow-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
+                <RefreshCw className="w-6 h-6 text-primary animate-spin" />
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground">Carregando produtos...</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Conectando ao WooCommerce e buscando produtos disponíveis.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Import Configuration */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -351,11 +424,20 @@ const Importer = () => {
                     />
                     
                     <div className="flex-shrink-0">
-                      <img 
-                        src={product.image} 
-                        alt={product.name}
-                        className="w-16 h-16 object-cover rounded-lg border"
-                      />
+                      {product.image ? (
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          className="w-16 h-16 object-cover rounded-lg border"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop&crop=center';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-muted rounded-lg border flex items-center justify-center">
+                          <Package className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex-grow min-w-0">
@@ -430,15 +512,15 @@ const Importer = () => {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-bold text-xl text-accent">
-                  R$ {mockProducts
-                    .filter(p => selectedProducts.includes(p.id))
-                    .reduce((sum, p) => sum + (p.salePrice || p.price), 0)
-                    .toFixed(2)}
-                </p>
-                <p className="text-sm text-muted-foreground">Valor total</p>
-              </div>
+               <div className="text-right">
+                 <p className="font-bold text-xl text-accent">
+                   R$ {products
+                     .filter(p => selectedProducts.includes(p.id))
+                     .reduce((sum, p) => sum + (p.salePrice || p.price), 0)
+                     .toFixed(2)}
+                 </p>
+                 <p className="text-sm text-muted-foreground">Valor total</p>
+               </div>
             </div>
           </CardContent>
         </Card>
