@@ -339,7 +339,7 @@ serve(async (req) => {
               last_sync_at: new Date().toISOString(),
               error_message: null
             }, {
-              onConflict: 'user_id,integration_type'
+              onConflict: 'user_id,integration_type,store_url'
             })
             .select()
             .single();
