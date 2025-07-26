@@ -145,8 +145,20 @@ serve(async (req) => {
 
         const credentials = JSON.parse(decryptedCredentials);
         
+        // Handle legacy credentials that might not have shopUrl
+        const shopUrl = credentials.shopUrl || integrationData.store_url;
+        if (!shopUrl) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'URL da loja não encontrada nas credenciais'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
         // Extract shop name from URL
-        const shopName = credentials.shopUrl.replace(/^https?:\/\//, '').replace('.myshopify.com', '').replace(/\/$/, '')
+        const shopName = shopUrl.replace(/^https?:\/\//, '').replace('.myshopify.com', '').replace(/\/$/, '')
         
         // Test connection to Shopify API
         const testResponse = await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/shop.json`, {
