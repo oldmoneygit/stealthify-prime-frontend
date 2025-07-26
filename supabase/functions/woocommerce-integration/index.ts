@@ -282,11 +282,12 @@ serve(async (req) => {
             .eq('user_id', demoUserId)
             .eq('platform', 'woocommerce')
             .eq('is_active', true)
-            .single();
+            .order('updated_at', { ascending: false })
+            .limit(1);
 
           console.log('Integration query result:', { integrationData, integrationError });
 
-          if (integrationError || !integrationData) {
+          if (integrationError || !integrationData || integrationData.length === 0) {
             console.error('❌ No WooCommerce integration found');
             return new Response(JSON.stringify({
               success: false,
@@ -297,10 +298,13 @@ serve(async (req) => {
             });
           }
 
+          const integration = integrationData[0]; // Get the first (most recent) integration
+          console.log('Using integration:', integration.id);
+
           // Decrypt credentials
           const { data: decryptedCredentials, error: decryptError } = await supabaseClient.rpc(
             'decrypt_integration_credentials',
-            { encrypted_data: integrationData.encrypted_credentials }
+            { encrypted_data: integration.encrypted_credentials }
           );
           
           if (decryptError) {
@@ -369,8 +373,8 @@ serve(async (req) => {
             success: true,
             products: products,
             storeInfo: {
-              name: integrationData.store_name,
-              url: integrationData.store_url,
+              name: integration.store_name,
+              url: integration.store_url,
               totalProducts: totalProducts,
               apiUsed: productUrl,
               currency: 'MXN'
