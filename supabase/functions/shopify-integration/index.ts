@@ -82,19 +82,12 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    // Get the user from the JWT token
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // For public access, we'll use a demo user ID
+    // In production, you'd implement proper authentication
+    const demoUserId = 'demo-user-' + Date.now().toString();
 
     const { action, ...body } = await req.json();
 
@@ -102,13 +95,13 @@ serve(async (req) => {
       case 'test': {
         const { shopUrl, accessToken } = body;
         
-        console.log(`Testing Shopify connection for user ${user.id}`);
+        console.log(`Testing Shopify connection for user ${demoUserId}`);
         
         const testResult = await testShopifyConnection(shopUrl, accessToken);
         
         await logAction(
           supabaseClient,
-          user.id,
+          demoUserId,
           null,
           'test_connection',
           testResult.success ? 'success' : 'error',
@@ -124,7 +117,7 @@ serve(async (req) => {
       case 'save': {
         const { storeName, shopUrl, accessToken } = body;
         
-        console.log(`Saving Shopify integration for user ${user.id}`);
+        console.log(`Saving Shopify integration for user ${demoUserId}`);
 
         // First test the connection
         const testResult = await testShopifyConnection(shopUrl, accessToken);
@@ -140,7 +133,7 @@ serve(async (req) => {
         }
 
         // Encrypt credentials
-        const encryptionKey = user.id; // Using user ID as encryption key
+        const encryptionKey = demoUserId; // Using demo user ID as encryption key
         const credentials: ShopifyCredentials = { shopUrl, accessToken };
         const encryptedCredentials = encrypt(JSON.stringify(credentials), encryptionKey);
 
@@ -148,7 +141,7 @@ serve(async (req) => {
         const { data, error } = await supabaseClient
           .from('user_integrations')
           .upsert({
-            user_id: user.id,
+            user_id: demoUserId,
             integration_type: 'shopify',
             store_name: storeName,
             store_url: shopUrl,
@@ -166,7 +159,7 @@ serve(async (req) => {
           console.error('Database error:', error);
           await logAction(
             supabaseClient,
-            user.id,
+            demoUserId,
             null,
             'save_integration',
             'error',
@@ -185,7 +178,7 @@ serve(async (req) => {
 
         await logAction(
           supabaseClient,
-          user.id,
+          demoUserId,
           data.id,
           'save_integration',
           'success',
@@ -211,7 +204,7 @@ serve(async (req) => {
         const { data, error } = await supabaseClient
           .from('user_integrations')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', demoUserId)
           .eq('integration_type', 'shopify');
 
         if (error) {
