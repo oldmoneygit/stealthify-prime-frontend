@@ -14,7 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      integration_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          integration_id: string | null
+          message: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+          message: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+          message?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "user_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_integrations: {
+        Row: {
+          created_at: string
+          encrypted_credentials: string
+          error_message: string | null
+          id: string
+          integration_type: string
+          last_sync_at: string | null
+          status: string
+          store_name: string
+          store_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_credentials: string
+          error_message?: string | null
+          id?: string
+          integration_type: string
+          last_sync_at?: string | null
+          status?: string
+          store_name: string
+          store_url: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_credentials?: string
+          error_message?: string | null
+          id?: string
+          integration_type?: string
+          last_sync_at?: string | null
+          status?: string
+          store_name?: string
+          store_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
