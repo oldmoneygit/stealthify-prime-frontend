@@ -203,6 +203,7 @@ const Importer = () => {
         
         try {
           // Import product to Shopify
+          console.log('Importing product to Shopify:', product.sku)
           const { data, error } = await supabase.functions.invoke('shopify-integration', {
             body: { 
               action: 'import_product',
@@ -214,12 +215,14 @@ const Importer = () => {
             }
           })
 
+          console.log('Shopify response:', data, error)
+
           if (error) {
             throw new Error(`Erro ao importar ${product.sku}: ${error.message}`)
           }
 
-          if (!data.success) {
-            throw new Error(`Erro ao importar ${product.sku}: ${data.error}`)
+          if (!data?.success) {
+            throw new Error(`Erro ao importar ${product.sku}: ${data?.error || 'Erro desconhecido'}`)
           }
           
           const progress = ((i + 1) / selectedProductsData.length) * 100

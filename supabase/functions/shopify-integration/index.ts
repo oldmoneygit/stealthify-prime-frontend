@@ -36,11 +36,14 @@ serve(async (req) => {
 
     const { action, ...requestData } = await req.json()
     console.log('Shopify Integration - Action:', action)
+    console.log('Request data:', requestData)
 
     if (action === 'import_product') {
       const { product }: { product: ShopifyProduct } = requestData
+      console.log('Product to import:', product.sku, product.camouflageTitle)
       
       // Get Shopify credentials
+      console.log('Fetching Shopify integration...')
       const { data: integrations, error: integrationsError } = await supabaseClient
         .from('integrations')
         .select('*')
@@ -48,7 +51,10 @@ serve(async (req) => {
         .eq('is_active', true)
         .single()
 
+      console.log('Integration found:', !!integrations, 'Error:', integrationsError)
+
       if (integrationsError || !integrations) {
+        console.error('No Shopify integration found:', integrationsError)
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -62,12 +68,16 @@ serve(async (req) => {
       }
 
       // Decrypt credentials
+      console.log('Decrypting credentials...')
       const { data: decryptedData, error: decryptError } = await supabaseClient.rpc(
         'decrypt_integration_credentials',
         { encrypted_data: integrations.encrypted_credentials }
       )
 
+      console.log('Decryption result:', !!decryptedData, 'Error:', decryptError)
+
       if (decryptError || !decryptedData) {
+        console.error('Decryption failed:', decryptError)
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -82,54 +92,10 @@ serve(async (req) => {
 
       const credentials = JSON.parse(decryptedData)
       const { shopName, accessToken } = credentials
+      console.log('Shop name:', shopName, 'Has access token:', !!accessToken)
 
-      // Upload camouflage image to Shopify first
-      let shopifyImageUrl = null
-      if (product.camouflageImage) {
-        try {
-          // Convert base64 to blob for upload
-          const base64Data = product.camouflageImage.split(',')[1]
-          const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-          
-          // Create image in Shopify
-          const imageResponse = await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/products.json`, {
-            method: 'POST',
-            headers: {
-              'X-Shopify-Access-Token': accessToken,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              product: {
-                title: `temp-image-${Date.now()}`,
-                product_type: 'temp',
-                vendor: 'temp',
-                images: [{
-                  attachment: product.camouflageImage
-                }]
-              }
-            })
-          })
-
-          if (imageResponse.ok) {
-            const tempProduct = await imageResponse.json()
-            if (tempProduct.product?.images?.[0]?.src) {
-              shopifyImageUrl = tempProduct.product.images[0].src
-              
-              // Delete the temporary product, keep only the image
-              await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/products/${tempProduct.product.id}.json`, {
-                method: 'DELETE',
-                headers: {
-                  'X-Shopify-Access-Token': accessToken
-                }
-              })
-            }
-          }
-        } catch (imageError) {
-          console.error('Error uploading image:', imageError)
-        }
-      }
-
-      // Create product in Shopify with camouflage
+      // Create product in Shopify with camouflage (simplified approach first)
+      console.log('Creating Shopify product...')
       const shopifyProductData = {
         product: {
           title: product.camouflageTitle || product.name,
@@ -143,16 +109,23 @@ serve(async (req) => {
             inventory_quantity: product.stock,
             inventory_management: 'shopify',
             inventory_policy: 'deny'
-          }],
-          ...(shopifyImageUrl && {
-            images: [{
-              src: shopifyImageUrl
-            }]
-          })
+          }]
         }
       }
 
-      const shopifyResponse = await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/products.json`, {
+      // Add image if provided
+      if (product.camouflageImage) {
+        shopifyProductData.product.images = [{
+          attachment: product.camouflageImage
+        }]
+      }
+
+      console.log('Shopify product data:', JSON.stringify(shopifyProductData, null, 2))
+
+      const shopifyUrl = `https://${shopName}.myshopify.com/admin/api/2025-07/products.json`
+      console.log('Making request to:', shopifyUrl)
+      
+      const shopifyResponse = await fetch(shopifyUrl, {
         method: 'POST',
         headers: {
           'X-Shopify-Access-Token': accessToken,
@@ -161,8 +134,11 @@ serve(async (req) => {
         body: JSON.stringify(shopifyProductData)
       })
 
+      console.log('Shopify response status:', shopifyResponse.status)
+
       if (!shopifyResponse.ok) {
         const errorData = await shopifyResponse.text()
+        console.error('Shopify API error:', shopifyResponse.status, errorData)
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -176,6 +152,7 @@ serve(async (req) => {
       }
 
       const shopifyProduct = await shopifyResponse.json()
+      console.log('Product created successfully:', shopifyProduct.product?.id)
       
       return new Response(
         JSON.stringify({ 
