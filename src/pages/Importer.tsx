@@ -68,18 +68,25 @@ const Importer = () => {
   const [hasWooCommerceConnection, setHasWooCommerceConnection] = useState<boolean | null>(null)
   const [exchangeRate, setExchangeRate] = useState<number>(1)
   const [selectedCurrency, setSelectedCurrency] = useState<string>('MXN')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalProducts, setTotalProducts] = useState(0)
+  const productsPerPage = 250
 
   // Load WooCommerce products on component mount
   useEffect(() => {
     fetchProducts()
   }, [])
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1) => {
     setIsLoadingProducts(true)
     
     try {
       const { data, error } = await supabase.functions.invoke('woocommerce-integration', {
-        body: { action: 'fetch_products' }
+        body: { 
+          action: 'fetch_products',
+          page: page,
+          per_page: productsPerPage
+        }
       })
 
       if (error) {
@@ -105,11 +112,13 @@ const Importer = () => {
         
         setProducts(data.products)
         setStoreInfo(data.storeInfo)
+        setTotalProducts(data.storeInfo.totalProducts)
+        setCurrentPage(page)
         setHasWooCommerceConnection(true)
         
         toast({
           title: "Produtos carregados!",
-          description: `${data.products.length} produtos encontrados na loja ${data.storeInfo.name}`,
+          description: `${data.products.length} produtos encontrados (página ${page})`,
         })
       } else {
         setHasWooCommerceConnection(false)
@@ -302,8 +311,14 @@ const Importer = () => {
   }
 
   const refreshProducts = async () => {
-    await fetchProducts()
+    await fetchProducts(currentPage)
   }
+
+  const handlePageChange = (page: number) => {
+    fetchProducts(page)
+  }
+
+  const totalPages = Math.ceil(totalProducts / productsPerPage)
 
   return (
     <div className="space-y-8">
@@ -617,6 +632,53 @@ const Importer = () => {
                 <p className="text-sm text-muted-foreground mt-1">
                   Tente ajustar os filtros ou verificar a conexão com o WooCommerce
                 </p>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {hasWooCommerceConnection && totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Página {currentPage} de {totalPages}</span>
+                  <span>•</span>
+                  <span>{totalProducts} produtos total</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || isLoadingProducts}
+                  >
+                    Anterior
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                      if (page > totalPages) return null;
+                      return (
+                        <Button
+                          key={page}
+                          variant={page === currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(page)}
+                          disabled={isLoadingProducts}
+                          className="w-8 h-8 p-0"
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages || isLoadingProducts}
+                  >
+                    Próxima
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

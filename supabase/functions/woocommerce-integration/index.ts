@@ -269,6 +269,7 @@ serve(async (req) => {
 
       case 'fetch_products': {
         console.log('Processing fetch_products action');
+        const { page = 1, per_page = 250 } = requestBody;
         
         try {
           const { data: integrationData, error: integrationError } = await supabaseClient
@@ -303,8 +304,26 @@ serve(async (req) => {
           const auth = btoa(`${credentials.consumerKey}:${credentials.consumerSecret}`);
           const cleanUrl = credentials.storeUrl.replace(/\/$/, '');
           
-          // Fetch products
-          const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=100&status=publish`;
+          // First, get total count for pagination
+          const countUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=1&status=publish`;
+          console.log('Getting total count from:', countUrl);
+          
+          const countResponse = await fetch(countUrl, {
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(30000)
+          });
+
+          if (!countResponse.ok) {
+            throw new Error(`Count API request failed: ${countResponse.status}`);
+          }
+
+          const totalProducts = parseInt(countResponse.headers.get('X-WP-Total') || '0');
+          
+          // Fetch products with pagination
+          const productUrl = `${cleanUrl}/wp-json/wc/v3/products?per_page=${per_page}&page=${page}&status=publish`;
           console.log('Fetching products from:', productUrl);
           
           const response = await fetch(productUrl, {
@@ -344,7 +363,7 @@ serve(async (req) => {
             storeInfo: {
               name: integrationData.store_name,
               url: integrationData.store_url,
-              totalProducts: products.length,
+              totalProducts: totalProducts,
               apiUsed: productUrl,
               currency: 'MXN'
             }

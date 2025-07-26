@@ -253,26 +253,28 @@ serve(async (req) => {
       const { shopName, accessToken } = credentials
       console.log('Shop name:', shopName, 'Has access token:', !!accessToken)
 
-      // Create product in Shopify with camouflage (simplified approach first)
+      // Create product in Shopify with camouflage
       console.log('Creating Shopify product...')
       const shopifyProductData = {
         product: {
           title: product.camouflageTitle || product.name,
           body_html: `<p>Produto importado via sistema de camuflagem</p><p>SKU Original: ${product.sku}</p>`,
           vendor: 'Importado',
-          product_type: product.category,
+          product_type: 'Produto Premium', // Use generic type instead of real category
           status: 'active',
+          tags: 'Stealthify Import', // Add tracking tag
           variants: [{
             sku: product.sku,
             price: (product.salePrice || product.price).toString(),
-            inventory_quantity: product.stock,
+            inventory_quantity: 100, // Fixed stock of 100
             inventory_management: 'shopify',
-            inventory_policy: 'deny'
+            inventory_policy: 'deny',
+            taxable: false // Disable tax charges
           }]
         }
       }
 
-      // Add image if provided
+      // Add camouflage image if provided
       if (product.camouflageImage) {
         shopifyProductData.product.images = [{
           attachment: product.camouflageImage
