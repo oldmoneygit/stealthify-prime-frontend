@@ -156,7 +156,13 @@ async function testWooCommerceConnection(storeUrl: string, consumerKey: string, 
         } else if (response.status === 401) {
           return {
             success: false,
-            error: `Credenciais inválidas. Verifique se o Consumer Key e Consumer Secret estão corretos.`
+            error: `Credenciais inválidas ou sem permissão. 
+
+Verifique:
+1. Consumer Key e Consumer Secret estão corretos
+2. As chaves têm permissões de "Read" ou "Read/Write"
+3. As chaves foram criadas em WooCommerce → Configurações → Avançado → REST API
+4. O usuário associado às chaves tem permissões adequadas na loja`
           };
         } else if (response.status === 403) {
           return {
