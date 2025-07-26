@@ -77,7 +77,10 @@ export function useIntegrations() {
         throw error;
       }
 
-      if (data.success) {
+      // Check if data has success property (new format) or if it's the integration object directly (old format)
+      const isSuccess = data.success === true || (data && !data.error && !data.success);
+      
+      if (isSuccess) {
         toast({
           title: "Conexão bem-sucedida!",
           description: "WooCommerce conectado com sucesso. Salvando credenciais...",

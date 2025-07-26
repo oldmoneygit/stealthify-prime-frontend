@@ -217,32 +217,45 @@ const Integrations = () => {
       // Test Shopify connection
       await testShopifyConnection(shopifyUrl, shopifyToken)
     } else {
-      // WooCommerce - validate all fields
-      if (!formData.wooUrl || !formData.wooKey || !formData.wooSecret || !formData.wooStoreName) {
+      // WooCommerce - check if we should use form data or modal data
+      const useModalData = editModal.woocommerce;
+      const testData = useModalData ? modalData : formData;
+      
+      const wooUrl = useModalData ? testData.wooUrl : testData.wooUrl;
+      const wooKey = useModalData ? testData.wooKey : testData.wooKey;
+      const wooSecret = useModalData ? testData.wooSecret : testData.wooSecret;
+      const wooStoreName = useModalData ? testData.wooStoreName : testData.wooStoreName;
+      
+      if (!wooUrl || !wooKey || !wooSecret || !wooStoreName) {
         toast({
           title: "Campos obrigatórios",
-          description: "Preencha todos os campos do WooCommerce para testar e salvar",
+          description: "Preencha todos os campos do WooCommerce para testar",
           variant: "destructive"
         })
         return
       }
       
       console.log('Starting WooCommerce test with data:', {
-        url: formData.wooUrl,
-        storeName: formData.wooStoreName,
-        hasKey: !!formData.wooKey,
-        hasSecret: !!formData.wooSecret
+        url: wooUrl,
+        storeName: wooStoreName,
+        hasKey: !!wooKey,
+        hasSecret: !!wooSecret,
+        source: useModalData ? 'modal' : 'form'
       });
       
       // For WooCommerce, testing will automatically save if successful
-      const result = await testWooCommerceConnection(formData.wooUrl, formData.wooKey, formData.wooSecret, formData.wooStoreName)
+      const result = await testWooCommerceConnection(wooUrl, wooKey, wooSecret, wooStoreName)
       if (result.success) {
         // Reload integrations after successful save
         const wooCommerceData = await getIntegrations('woocommerce')
         setWooCommerceIntegrations(wooCommerceData)
         setEditMode(prev => ({ ...prev, woocommerce: false }))
-        // Clear sensitive data from form
+        
+        // Clear sensitive data from both form and modal
         setFormData(prev => ({ ...prev, wooKey: "", wooSecret: "" }))
+        if (useModalData) {
+          closeEditModal('woocommerce')
+        }
       }
     }
   }
