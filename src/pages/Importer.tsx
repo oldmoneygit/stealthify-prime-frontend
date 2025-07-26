@@ -67,6 +67,7 @@ const Importer = () => {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [hasWooCommerceConnection, setHasWooCommerceConnection] = useState<boolean | null>(null)
   const [exchangeRate, setExchangeRate] = useState<number>(1)
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('MXN')
 
   // Load WooCommerce products on component mount
   useEffect(() => {
@@ -93,9 +94,13 @@ const Importer = () => {
       }
 
       if (data.success) {
+        // Set currency from store info or default to MXN
+        const storeCurrency = data.storeInfo.currency || 'MXN'
+        setSelectedCurrency(storeCurrency)
+        
         // Get exchange rate if currency is not BRL
-        if (data.storeInfo.currency !== 'BRL') {
-          await fetchExchangeRate(data.storeInfo.currency)
+        if (storeCurrency !== 'BRL') {
+          await fetchExchangeRate(storeCurrency)
         }
         
         setProducts(data.products)
@@ -182,33 +187,76 @@ const Importer = () => {
     setIsImporting(true)
     setImportProgress(0)
 
-    // Get selected products data from real products
-    const selectedProductsData = products.filter(p => selectedProducts.includes(p.id))
-    
-    for (let i = 0; i < selectedProductsData.length; i++) {
-      const product = selectedProductsData[i]
+    try {
+      // Get selected products data from real products
+      const selectedProductsData = products.filter(p => selectedProducts.includes(p.id))
       
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Convert image to base64
+      const imageBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(camouflageImage!)
+      })
       
-      const progress = ((i + 1) / selectedProductsData.length) * 100
-      setImportProgress(progress)
+      for (let i = 0; i < selectedProductsData.length; i++) {
+        const product = selectedProductsData[i]
+        
+        try {
+          // Import product to Shopify
+          const { data, error } = await supabase.functions.invoke('shopify-integration', {
+            body: { 
+              action: 'import_product',
+              product: {
+                ...product,
+                camouflageTitle: genericTitle,
+                camouflageImage: imageBase64
+              }
+            }
+          })
+
+          if (error) {
+            throw new Error(`Erro ao importar ${product.sku}: ${error.message}`)
+          }
+
+          if (!data.success) {
+            throw new Error(`Erro ao importar ${product.sku}: ${data.error}`)
+          }
+          
+          const progress = ((i + 1) / selectedProductsData.length) * 100
+          setImportProgress(progress)
+
+          toast({
+            title: `Produto importado: ${product.sku}`,
+            description: `${genericTitle} → ${product.sku} importado com sucesso!`,
+          })
+        } catch (productError) {
+          console.error(`Error importing product ${product.sku}:`, productError)
+          toast({
+            title: `Erro ao importar: ${product.sku}`,
+            description: productError instanceof Error ? productError.message : "Erro desconhecido",
+            variant: "destructive"
+          })
+        }
+      }
+
+      setIsImporting(false)
+      setSelectedProducts([])
+      setCamouflageImage(null)
+      setGenericTitle("Produto Premium")
 
       toast({
-        title: `Produto importado: ${product.sku}`,
-        description: `${genericTitle} → ${product.sku} importado com sucesso!`,
+        title: "Importação concluída!",
+        description: `${selectedProductsData.length} produto(s) importado(s) para a Shopify.`,
+      })
+    } catch (error) {
+      console.error('Import error:', error)
+      setIsImporting(false)
+      toast({
+        title: "Erro na importação",
+        description: "Ocorreu um erro durante a importação. Tente novamente.",
+        variant: "destructive"
       })
     }
-
-    setIsImporting(false)
-    setSelectedProducts([])
-    setCamouflageImage(null)
-    setGenericTitle("Produto Premium")
-
-    toast({
-      title: "Importação concluída!",
-      description: `${selectedProductsData.length} produto(s) importado(s) para a Shopify.`,
-    })
   }
 
   const fetchExchangeRate = async (fromCurrency: string) => {
@@ -222,16 +270,18 @@ const Importer = () => {
     }
   }
 
+  const currencies = [
+    { code: 'MXN', symbol: 'MX$', name: 'Peso Mexicano' },
+    { code: 'ARS', symbol: 'AR$', name: 'Peso Argentino' },
+    { code: 'BRL', symbol: 'R$', name: 'Real Brasileiro' },
+    { code: 'USD', symbol: '$', name: 'Dólar Americano' },
+    { code: 'EUR', symbol: '€', name: 'Euro' },
+    { code: 'GBP', symbol: '£', name: 'Libra Esterlina' }
+  ]
+
   const formatPrice = (price: number, currency: string) => {
-    const currencySymbols: { [key: string]: string } = {
-      'USD': '$',
-      'EUR': '€',
-      'MXN': 'MX$',
-      'BRL': 'R$',
-      'GBP': '£'
-    }
-    
-    const symbol = currencySymbols[currency] || currency
+    const currencyData = currencies.find(c => c.code === currency)
+    const symbol = currencyData?.symbol || currency
     const priceInBRL = currency !== 'BRL' ? price * exchangeRate : price
     
     if (currency === 'BRL') {
@@ -342,6 +392,30 @@ const Importer = () => {
               />
               <p className="text-xs text-muted-foreground">
                 Este título substituirá os nomes originais na Shopify
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="currency-select">Moeda dos Produtos</Label>
+              <select
+                id="currency-select"
+                value={selectedCurrency}
+                onChange={(e) => {
+                  setSelectedCurrency(e.target.value)
+                  if (e.target.value !== 'BRL') {
+                    fetchExchangeRate(e.target.value)
+                  }
+                }}
+                className="w-full px-3 py-2 bg-background/50 border border-border rounded-lg text-foreground"
+              >
+                {currencies.map(currency => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.symbol} {currency.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Moeda utilizada para exibir os preços dos produtos
               </p>
             </div>
 
@@ -500,11 +574,11 @@ const Importer = () => {
                           <div className="flex items-center gap-2">
                             {product.salePrice && (
                               <span className="text-sm text-muted-foreground line-through">
-                                {formatPrice(product.price, product.currency)}
+                                {formatPrice(product.price, selectedCurrency)}
                               </span>
                             )}
                             <span className="font-bold text-accent">
-                              {formatPrice(product.salePrice || product.price, product.currency)}
+                              {formatPrice(product.salePrice || product.price, selectedCurrency)}
                             </span>
                           </div>
                           <div className="flex items-center gap-1 mt-1 justify-end">
@@ -562,24 +636,14 @@ const Importer = () => {
                 </div>
               </div>
                 <div className="text-right">
-                 <p className="font-bold text-xl text-accent">
-                   {storeInfo?.currency && storeInfo.currency !== 'BRL' ? (
-                     <>
-                       {storeInfo.currency === 'MXN' ? 'MX$' : storeInfo.currency} {products
-                         .filter(p => selectedProducts.includes(p.id))
-                         .reduce((sum, p) => sum + (p.salePrice || p.price), 0)
-                         .toFixed(2)} ~ R$ {(products
-                         .filter(p => selectedProducts.includes(p.id))
-                         .reduce((sum, p) => sum + (p.salePrice || p.price), 0) * exchangeRate)
-                         .toFixed(2)}
-                     </>
-                   ) : (
-                     `R$ ${products
-                       .filter(p => selectedProducts.includes(p.id))
-                       .reduce((sum, p) => sum + (p.salePrice || p.price), 0)
-                       .toFixed(2)}`
-                   )}
-                 </p>
+                  <p className="font-bold text-xl text-accent">
+                    {formatPrice(
+                      products
+                        .filter(p => selectedProducts.includes(p.id))
+                        .reduce((sum, p) => sum + (p.salePrice || p.price), 0),
+                      selectedCurrency
+                    )}
+                  </p>
                  <p className="text-sm text-muted-foreground">Valor total</p>
                </div>
             </div>

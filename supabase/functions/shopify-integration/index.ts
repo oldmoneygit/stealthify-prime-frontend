@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -6,364 +6,208 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface ShopifyCredentials {
-  shopUrl: string;
-  accessToken: string;
-}
-
-// Simple encryption/decryption functions
-function encrypt(text: string, key: string): string {
-  // Simple XOR encryption for demo - in production use proper encryption
-  const encoded = new TextEncoder().encode(text);
-  const keyBytes = new TextEncoder().encode(key);
-  const encrypted = encoded.map((byte, i) => byte ^ keyBytes[i % keyBytes.length]);
-  return btoa(String.fromCharCode(...encrypted));
-}
-
-function decrypt(encryptedText: string, key: string): string {
-  const encrypted = new Uint8Array(atob(encryptedText).split('').map(c => c.charCodeAt(0)));
-  const keyBytes = new TextEncoder().encode(key);
-  const decrypted = encrypted.map((byte, i) => byte ^ keyBytes[i % keyBytes.length]);
-  return new TextDecoder().decode(decrypted);
-}
-
-async function testShopifyConnection(shopUrl: string, accessToken: string): Promise<{ success: boolean; error?: string; shopInfo?: any }> {
-  try {
-    const cleanUrl = shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const apiUrl = `https://${cleanUrl}/admin/api/2024-07/shop.json`;
-    
-    const response = await fetch(apiUrl, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return {
-        success: false,
-        error: `Shopify API Error (${response.status}): ${errorText}`
-      };
-    }
-
-    const data = await response.json();
-    return {
-      success: true,
-      shopInfo: data.shop
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: `Connection Error: ${error.message}`
-    };
-  }
-}
-
-async function logAction(supabase: any, userId: string, integrationId: string | null, action: string, status: string, message: string, details: any = null) {
-  await supabase
-    .from('integration_logs')
-    .insert({
-      user_id: userId,
-      integration_id: integrationId,
-      action,
-      status,
-      message,
-      details
-    });
+interface ShopifyProduct {
+  id: number;
+  name: string;
+  sku: string;
+  price: number;
+  salePrice: number | null;
+  image: string | null;
+  stock: number;
+  category: string;
+  status: string;
+  description: string;
+  permalink: string;
+  currency: string;
+  camouflageTitle: string;
+  camouflageImage: string;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    console.log('Shopify integration function called with method:', req.method);
-    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    // For public access, we'll use a fixed demo user UUID
-    const demoUserId = '00000000-0000-0000-0000-000000000001';
+    const { action, ...requestData } = await req.json()
+    console.log('Shopify Integration - Action:', action)
 
-    let requestBody;
-    try {
-      requestBody = await req.json();
-      console.log('Request body parsed:', requestBody);
-    } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
-      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (action === 'import_product') {
+      const { product }: { product: ShopifyProduct } = requestData
+      
+      // Get Shopify credentials
+      const { data: integrations, error: integrationsError } = await supabaseClient
+        .from('integrations')
+        .select('*')
+        .eq('platform', 'shopify')
+        .eq('is_active', true)
+        .single()
 
-    const { action, ...body } = requestBody;
-
-    switch (action) {
-      case 'test': {
-        const { shopUrl, accessToken } = body;
-        
-        console.log(`Testing Shopify connection for user ${demoUserId}`);
-        
-        const testResult = await testShopifyConnection(shopUrl, accessToken);
-        
-        await logAction(
-          supabaseClient,
-          demoUserId,
-          null,
-          'test_connection',
-          testResult.success ? 'success' : 'error',
-          testResult.success ? 'Shopify connection test successful' : testResult.error!,
-          { shopUrl, shopInfo: testResult.shopInfo }
-        );
-
-        return new Response(JSON.stringify(testResult), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      case 'test_saved': {
-        console.log('Processing test_saved action for user:', demoUserId);
-        
-        const { integrationId } = requestBody;
-        
-        if (!integrationId) {
-          return new Response(JSON.stringify({ 
+      if (integrationsError || !integrations) {
+        return new Response(
+          JSON.stringify({ 
             success: false, 
-            error: 'Integration ID is required'
-          }), {
-            status: 400,
+            error: 'Nenhuma integração Shopify ativa encontrada' 
+          }),
+          { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-
-        try {
-          // Get the saved integration
-          const { data: integration, error: fetchError } = await supabaseClient
-            .from('user_integrations')
-            .select('*')
-            .eq('id', integrationId)
-            .eq('user_id', demoUserId)
-            .eq('integration_type', 'shopify')
-            .single();
-
-          if (fetchError || !integration) {
-            return new Response(JSON.stringify({
-              success: false,
-              error: 'Integration not found'
-            }), {
-              status: 404,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
+            status: 400 
           }
-
-          // Decrypt credentials
-          const encryptionKey = demoUserId;
-          const decryptedCredentials = decrypt(integration.encrypted_credentials, encryptionKey);
-          const credentials: ShopifyCredentials = JSON.parse(decryptedCredentials);
-
-          // Test the connection
-          const testResult = await testShopifyConnection(credentials.shopUrl, credentials.accessToken);
-
-          if (testResult.success) {
-            // Update last sync time
-            await supabaseClient
-              .from('user_integrations')
-              .update({
-                last_sync_at: new Date().toISOString(),
-                status: 'connected',
-                error_message: null
-              })
-              .eq('id', integrationId);
-
-            await logAction(
-              supabaseClient,
-              demoUserId,
-              integrationId,
-              'test_saved_connection',
-              'success',
-              'Shopify connection test successful with saved credentials',
-              { shopInfo: testResult.shopInfo }
-            );
-          } else {
-            await logAction(
-              supabaseClient,
-              demoUserId,
-              integrationId,
-              'test_saved_connection',
-              'error',
-              'Shopify connection test failed: ' + testResult.error,
-              { error: testResult.error }
-            );
-          }
-
-          return new Response(JSON.stringify(testResult), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } catch (error) {
-          console.error('Error testing saved credentials:', error);
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Failed to test saved credentials'
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
+        )
       }
 
-      case 'save': {
-        const { storeName, shopUrl, accessToken } = body;
-        
-        console.log(`Saving Shopify integration for user ${demoUserId}`);
+      // Decrypt credentials
+      const { data: decryptedData, error: decryptError } = await supabaseClient.rpc(
+        'decrypt_integration_credentials',
+        { encrypted_data: integrations.encrypted_credentials }
+      )
 
-        // First test the connection
-        const testResult = await testShopifyConnection(shopUrl, accessToken);
-        
-        if (!testResult.success) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Invalid credentials: ' + testResult.error
-          }), {
-            status: 400,
+      if (decryptError || !decryptedData) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Erro ao descriptografar credenciais da Shopify' 
+          }),
+          { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
+            status: 500 
+          }
+        )
+      }
 
-        // Encrypt credentials
-        const encryptionKey = demoUserId; // Using demo user ID as encryption key
-        const credentials: ShopifyCredentials = { shopUrl, accessToken };
-        const encryptedCredentials = encrypt(JSON.stringify(credentials), encryptionKey);
+      const credentials = JSON.parse(decryptedData)
+      const { shopName, accessToken } = credentials
 
-        // Save to database
-        const { data, error } = await supabaseClient
-          .from('user_integrations')
-          .upsert({
-            user_id: demoUserId,
-            integration_type: 'shopify',
-            store_name: storeName,
-            store_url: shopUrl,
-            encrypted_credentials: encryptedCredentials,
-            status: 'connected',
-            last_sync_at: new Date().toISOString(),
-            error_message: null
-          }, {
-            onConflict: 'user_id,integration_type,store_url'
+      // Upload camouflage image to Shopify first
+      let shopifyImageUrl = null
+      if (product.camouflageImage) {
+        try {
+          // Convert base64 to blob for upload
+          const base64Data = product.camouflageImage.split(',')[1]
+          const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+          
+          // Create image in Shopify
+          const imageResponse = await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/products.json`, {
+            method: 'POST',
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              product: {
+                title: `temp-image-${Date.now()}`,
+                product_type: 'temp',
+                vendor: 'temp',
+                images: [{
+                  attachment: product.camouflageImage
+                }]
+              }
+            })
           })
-          .select()
-          .single();
 
-        if (error) {
-          console.error('Database error:', error);
-          await logAction(
-            supabaseClient,
-            demoUserId,
-            null,
-            'save_integration',
-            'error',
-            'Failed to save integration: ' + error.message,
-            { shopUrl, error }
-          );
-
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Failed to save integration'
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-
-        await logAction(
-          supabaseClient,
-          demoUserId,
-          data.id,
-          'save_integration',
-          'success',
-          'Shopify integration saved successfully',
-          { shopUrl, storeName, shopInfo: testResult.shopInfo }
-        );
-
-        return new Response(JSON.stringify({
-          success: true,
-          integration: {
-            id: data.id,
-            storeName,
-            shopUrl,
-            status: 'connected',
-            lastSync: data.last_sync_at
+          if (imageResponse.ok) {
+            const tempProduct = await imageResponse.json()
+            if (tempProduct.product?.images?.[0]?.src) {
+              shopifyImageUrl = tempProduct.product.images[0].src
+              
+              // Delete the temporary product, keep only the image
+              await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/products/${tempProduct.product.id}.json`, {
+                method: 'DELETE',
+                headers: {
+                  'X-Shopify-Access-Token': accessToken
+                }
+              })
+            }
           }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      case 'list': {
-        console.log('Processing list action for user:', demoUserId);
-        
-        try {
-          const { data, error } = await supabaseClient
-            .from('user_integrations')
-            .select('*')
-            .eq('user_id', demoUserId)
-            .eq('integration_type', 'shopify');
-
-          console.log('Database query result:', { data, error });
-
-          if (error) {
-            console.error('Database error in list action:', error);
-            return new Response(JSON.stringify({ error: 'Failed to fetch integrations', details: error.message }), {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
-
-          const integrations = data?.map(integration => ({
-            id: integration.id,
-            storeName: integration.store_name,
-            storeUrl: integration.store_url,
-            status: integration.status,
-            lastSync: integration.last_sync_at,
-            errorMessage: integration.error_message
-          })) || [];
-
-          console.log('Returning integrations:', integrations);
-
-          return new Response(JSON.stringify({ integrations }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } catch (listError) {
-          console.error('Exception in list action:', listError);
-          return new Response(JSON.stringify({ 
-            error: 'Failed to process list request', 
-            details: listError.message 
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+        } catch (imageError) {
+          console.error('Error uploading image:', imageError)
         }
       }
 
-      default:
-        return new Response(JSON.stringify({ error: 'Invalid action' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      // Create product in Shopify with camouflage
+      const shopifyProductData = {
+        product: {
+          title: product.camouflageTitle || product.name,
+          body_html: `<p>Produto importado via sistema de camuflagem</p><p>SKU Original: ${product.sku}</p>`,
+          vendor: 'Importado',
+          product_type: product.category,
+          status: 'active',
+          variants: [{
+            sku: product.sku,
+            price: (product.salePrice || product.price).toString(),
+            inventory_quantity: product.stock,
+            inventory_management: 'shopify',
+            inventory_policy: 'deny'
+          }],
+          ...(shopifyImageUrl && {
+            images: [{
+              src: shopifyImageUrl
+            }]
+          })
+        }
+      }
+
+      const shopifyResponse = await fetch(`https://${shopName}.myshopify.com/admin/api/2025-07/products.json`, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(shopifyProductData)
+      })
+
+      if (!shopifyResponse.ok) {
+        const errorData = await shopifyResponse.text()
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Erro da Shopify: ${shopifyResponse.status} - ${errorData}` 
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+
+      const shopifyProduct = await shopifyResponse.json()
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          shopifyProduct: shopifyProduct.product,
+          message: `Produto ${product.sku} importado com sucesso para a Shopify como "${product.camouflageTitle}"` 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
+
+    return new Response(
+      JSON.stringify({ success: false, error: 'Ação não reconhecida' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      }
+    )
+
   } catch (error) {
-    console.error('Shopify integration error:', error);
-    console.error('Error stack:', error.stack);
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error', 
-      details: error.message 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('Shopify Integration Error:', error)
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || 'Erro interno do servidor' 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
+    )
   }
-});
+})
